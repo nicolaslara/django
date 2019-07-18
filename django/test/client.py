@@ -1,3 +1,4 @@
+import asyncio
 import json
 import mimetypes
 import os
@@ -9,6 +10,8 @@ from http import HTTPStatus
 from importlib import import_module
 from io import BytesIO
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
+
+from asgiref.sync import async_to_sync
 
 from django.conf import settings
 from django.core.handlers.base import BaseHandler
@@ -136,7 +139,10 @@ class ClientHandler(BaseHandler):
         request._dont_enforce_csrf_checks = not self.enforce_csrf_checks
 
         # Request goes through middleware.
-        response = self.get_response(request)
+        if asyncio.iscoroutinefunction(self.get_response):
+            response = async_to_sync(self.get_response)(request)
+        else:
+            response = self.get_response(request)
 
         # Simulate behaviors of most Web servers.
         conditional_content_removal(request, response)

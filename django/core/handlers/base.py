@@ -56,11 +56,20 @@ class BaseHandler:
                 )
 
             if hasattr(mw_instance, 'process_view'):
-                self._view_middleware.insert(0, mw_instance.process_view)
+                if asyncio.iscoroutinefunction(mw_instance.process_view):
+                    self._view_middleware.insert(0, mw_instance.process_view)
+                else:
+                    self._view_middleware.insert(0, sync_to_async(mw_instance.process_view))
             if hasattr(mw_instance, 'process_template_response'):
-                self._template_response_middleware.append(mw_instance.process_template_response)
+                if asyncio.iscoroutinefunction(mw_instance.process_template_response):
+                    self._template_response_middleware.append(mw_instance.process_template_response)
+                else:
+                    self._template_response_middleware.append(sync_to_async(mw_instance.process_template_response))
             if hasattr(mw_instance, 'process_exception'):
-                self._exception_middleware.append(mw_instance.process_exception)
+                if asyncio.iscoroutinefunction(mw_instance.process_exception):
+                    self._exception_middleware.append(mw_instance.process_exception)
+                else:
+                    self._exception_middleware.append(sync_to_async(mw_instance.process_exception))
 
             if asyncio.iscoroutinefunction(mw_instance):
                 handler = convert_exception_to_response(mw_instance)
@@ -115,7 +124,7 @@ class BaseHandler:
 
         # Apply view middleware
         for middleware_method in self._view_middleware:
-            response = middleware_method(request, callback, callback_args, callback_kwargs)
+            response = await middleware_method(request, callback, callback_args, callback_kwargs)
             if response:
                 break
 
@@ -127,7 +136,7 @@ class BaseHandler:
             try:
                 response = await wrapped_callback(request, *callback_args, **callback_kwargs)
             except Exception as e:
-                response = self.process_exception_by_middleware(e, request)
+                response = await self.process_exception_by_middleware(e, request)
 
         # Complain if the view returned None (a common error).
         if response is None:
@@ -145,7 +154,7 @@ class BaseHandler:
         # response middleware and then render the response
         elif hasattr(response, 'render') and callable(response.render):
             for middleware_method in self._template_response_middleware:
-                response = middleware_method(request, response)
+                response = await middleware_method(request, response)
                 # Complain if the template response middleware returned None (a common error).
                 if response is None:
                     raise ValueError(
@@ -157,17 +166,17 @@ class BaseHandler:
             try:
                 response = response.render()
             except Exception as e:
-                response = self.process_exception_by_middleware(e, request)
+                response = await self.process_exception_by_middleware(e, request)
 
         return response
 
-    def process_exception_by_middleware(self, exception, request):
+    async def process_exception_by_middleware(self, exception, request):
         """
         Pass the exception to the exception middleware. If no middleware
         return a response for this exception, raise it.
         """
         for middleware_method in self._exception_middleware:
-            response = middleware_method(request, exception)
+            response = await middleware_method(request, exception)
             if response:
                 return response
         raise
