@@ -1,5 +1,8 @@
+import asyncio
 import re
 from io import BytesIO
+
+from asgiref.sync import async_to_sync
 
 from django.conf import settings
 from django.core import signals
@@ -130,7 +133,13 @@ class WSGIHandler(base.BaseHandler):
         set_script_prefix(get_script_name(environ))
         signals.request_started.send(sender=self.__class__, environ=environ)
         request = self.request_class(environ)
-        response = self.get_response(request)
+
+        # Get the response, either using async get_response or standard.
+        if asyncio.iscoroutinefunction(self.get_response):
+            response = async_to_sync(self.get_response)(request)
+        else:
+            # If get_response is synchronous, run it non-blocking.
+            response = self.get_response(request)
 
         response._handler_class = self.__class__
 

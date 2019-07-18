@@ -1,5 +1,8 @@
+import asyncio
 import logging
 import types
+
+from asgiref.sync import async_to_sync, sync_to_async
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, MiddlewareNotUsed
@@ -35,6 +38,10 @@ class BaseHandler:
             middleware = import_string(middleware_path)
             try:
                 mw_instance = middleware(handler)
+                # If they gave us back a synchronous middleware, re-construct with a synchronous handler
+                if not asyncio.iscoroutinefunction(mw_instance):
+                    logger.debug('Synchronous middleware adapted: %r', middleware_path)
+                    mw_instance = middleware(async_to_sync(handler))
             except MiddlewareNotUsed as exc:
                 if settings.DEBUG:
                     if str(exc):
@@ -55,7 +62,10 @@ class BaseHandler:
             if hasattr(mw_instance, 'process_exception'):
                 self._exception_middleware.append(mw_instance.process_exception)
 
-            handler = convert_exception_to_response(mw_instance)
+            if asyncio.iscoroutinefunction(mw_instance):
+                handler = convert_exception_to_response(mw_instance)
+            else:
+                handler = convert_exception_to_response(sync_to_async(mw_instance))
 
         # We only assign to this when initialization is complete as it is used
         # as a flag for initialization being complete.
@@ -65,14 +75,16 @@ class BaseHandler:
         non_atomic_requests = getattr(view, '_non_atomic_requests', set())
         for db in connections.all():
             if db.settings_dict['ATOMIC_REQUESTS'] and db.alias not in non_atomic_requests:
+                if asyncio.iscoroutinefunction(view):
+                    raise RuntimeError("You cannot use ATOMIC_REQUESTS with async views.")
                 view = transaction.atomic(using=db.alias)(view)
         return view
 
-    def get_response(self, request):
+    async def get_response(self, request):
         """Return an HttpResponse object for the given HttpRequest."""
         # Setup default url resolver for this thread
         set_urlconf(settings.ROOT_URLCONF)
-        response = self._middleware_chain(request)
+        response = await self._middleware_chain(request)
         response._closable_objects.append(request)
         if response.status_code >= 400:
             log_response(
@@ -82,7 +94,7 @@ class BaseHandler:
             )
         return response
 
-    def _get_response(self, request):
+    async def _get_response(self, request):
         """
         Resolve and call the view, then apply view, exception, and
         template_response middleware. This method is everything that happens
@@ -109,8 +121,11 @@ class BaseHandler:
 
         if response is None:
             wrapped_callback = self.make_view_atomic(callback)
+            # If it is a synchronous view, run it in a subthread
+            if not asyncio.iscoroutinefunction(wrapped_callback):
+                wrapped_callback = sync_to_async(wrapped_callback)
             try:
-                response = wrapped_callback(request, *callback_args, **callback_kwargs)
+                response = await wrapped_callback(request, *callback_args, **callback_kwargs)
             except Exception as e:
                 response = self.process_exception_by_middleware(e, request)
 
