@@ -59,22 +59,26 @@ class BaseHandler:
                 if asyncio.iscoroutinefunction(mw_instance.process_view):
                     self._view_middleware.insert(0, mw_instance.process_view)
                 else:
-                    self._view_middleware.insert(0, sync_to_async(mw_instance.process_view))
+                    self._view_middleware.insert(0, sync_to_async(mw_instance.process_view, thread_sensitive=True))
             if hasattr(mw_instance, 'process_template_response'):
                 if asyncio.iscoroutinefunction(mw_instance.process_template_response):
                     self._template_response_middleware.append(mw_instance.process_template_response)
                 else:
-                    self._template_response_middleware.append(sync_to_async(mw_instance.process_template_response))
+                    self._template_response_middleware.append(
+                        sync_to_async(mw_instance.process_template_response, thread_sensitive=True)
+                    )
             if hasattr(mw_instance, 'process_exception'):
                 if asyncio.iscoroutinefunction(mw_instance.process_exception):
                     self._exception_middleware.append(mw_instance.process_exception)
                 else:
-                    self._exception_middleware.append(sync_to_async(mw_instance.process_exception))
+                    self._exception_middleware.append(
+                        sync_to_async(mw_instance.process_exception, thread_sensitive=True)
+                    )
 
             if asyncio.iscoroutinefunction(mw_instance):
                 handler = convert_exception_to_response(mw_instance)
             else:
-                handler = convert_exception_to_response(sync_to_async(mw_instance))
+                handler = convert_exception_to_response(sync_to_async(mw_instance, thread_sensitive=True))
 
         # We only assign to this when initialization is complete as it is used
         # as a flag for initialization being complete.
@@ -132,7 +136,7 @@ class BaseHandler:
             wrapped_callback = self.make_view_atomic(callback)
             # If it is a synchronous view, run it in a subthread
             if not asyncio.iscoroutinefunction(wrapped_callback):
-                wrapped_callback = sync_to_async(wrapped_callback)
+                wrapped_callback = sync_to_async(wrapped_callback, thread_sensitive=True)
             try:
                 response = await wrapped_callback(request, *callback_args, **callback_kwargs)
             except Exception as e:
@@ -164,9 +168,16 @@ class BaseHandler:
                     )
 
             try:
-                response = response.render()
+                if asyncio.iscoroutinefunction(response.render):
+                    response = await response.render()
+                else:
+                    response = await sync_to_async(response.render, thread_sensitive=True)()
             except Exception as e:
                 response = await self.process_exception_by_middleware(e, request)
+
+        # Make sure the response is not a coroutine
+        if asyncio.iscoroutine(response):
+            raise RuntimeError("Response is still a coroutine")
 
         return response
 

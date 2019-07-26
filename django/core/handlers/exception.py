@@ -3,6 +3,8 @@ import logging
 import sys
 from functools import wraps
 
+from asgiref.sync import sync_to_async
+
 from django.conf import settings
 from django.core import signals
 from django.core.exceptions import (
@@ -35,7 +37,7 @@ def convert_exception_to_response(get_response):
             try:
                 response = await get_response(request)
             except Exception as exc:
-                response = response_for_exception(request, exc)
+                response = await sync_to_async(response_for_exception)(request, exc)
             return response
         return inner
     else:
