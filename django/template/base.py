@@ -162,6 +162,8 @@ class Template:
     def _render(self, context):
         return self.nodelist.render(context)
 
+    from django.utils.asyncio import async_unsafe
+    @async_unsafe
     def render(self, context):
         "Display stage -- can be called many times"
         with context.render_context.push_state(self):
