@@ -16,6 +16,8 @@ from urllib.parse import (
 )
 from urllib.request import url2pathname
 
+from asgiref.sync import async_to_sync
+
 from django.apps import apps
 from django.conf import settings
 from django.core import mail
@@ -1319,7 +1321,7 @@ class FSFilesHandler(WSGIHandler):
                 return self.serve(request)
             except Http404:
                 pass
-        return super().get_response(request)
+        return async_to_sync(super().get_response)(request)
 
     def serve(self, request):
         os_rel_path = self.file_path(request.path)
