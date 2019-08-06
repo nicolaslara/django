@@ -1,6 +1,7 @@
 from django.http import Http404, HttpResponse
 from django.template import engines
 from django.template.response import TemplateResponse
+from django.utils.decorators import async_middleware
 
 log = []
 
@@ -66,3 +67,21 @@ class NoTemplateResponseMiddleware(BaseMiddleware):
 class NotFoundMiddleware(BaseMiddleware):
     def __call__(self, request):
         raise Http404('not found')
+
+
+class TeapotMiddleware(BaseMiddleware):
+    def __call__(self, request):
+        response = self.get_response(request)
+        response.status_code = 418
+        return response
+
+
+@async_middleware
+def async_teapot_middleware(get_response):
+
+    async def middleware(request):
+        response = await get_response(request)
+        response.status_code = 418
+        return response
+
+    return middleware

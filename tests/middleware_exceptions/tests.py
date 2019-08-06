@@ -149,7 +149,7 @@ class MiddlewareNotUsedTests(SimpleTestCase):
         with self.assertLogs('django.request', 'DEBUG') as cm:
             self.client.get('/middleware_exceptions/view/')
         self.assertEqual(
-            cm.records[0].getMessage(),
+            cm.records[1].getMessage(),
             "MiddlewareNotUsed: 'middleware_exceptions.tests.MyMiddleware'"
         )
 
@@ -158,7 +158,7 @@ class MiddlewareNotUsedTests(SimpleTestCase):
         with self.assertLogs('django.request', 'DEBUG') as cm:
             self.client.get('/middleware_exceptions/view/')
         self.assertEqual(
-            cm.records[0].getMessage(),
+            cm.records[1].getMessage(),
             "MiddlewareNotUsed('middleware_exceptions.tests.MyMiddlewareWithExceptionMessage'): spam eggs"
         )
 
@@ -167,3 +167,23 @@ class MiddlewareNotUsedTests(SimpleTestCase):
         with self.assertRaisesMessage(AssertionError, 'no logs'):
             with self.assertLogs('django.request', 'DEBUG'):
                 self.client.get('/middleware_exceptions/view/')
+
+
+@override_settings(
+    ROOT_URLCONF='middleware_exceptions.urls',
+)
+class MiddlewareSyncAsyncTests(SimpleTestCase):
+
+    @override_settings(MIDDLEWARE=[
+        'middleware_exceptions.middleware.TeapotMiddleware',
+    ])
+    def test_sync_teapot_middleware(self):
+        response = self.client.get('/middleware_exceptions/view/')
+        self.assertEqual(response.status_code, 418)
+
+    @override_settings(MIDDLEWARE=[
+        'middleware_exceptions.middleware.async_teapot_middleware',
+    ])
+    def test_async_teapot_middleware(self):
+        response = self.client.get('/middleware_exceptions/view/')
+        self.assertEqual(response.status_code, 418)
