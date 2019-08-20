@@ -1082,7 +1082,8 @@ Attributes
 
 .. attribute:: StreamingHttpResponse.streaming_content
 
-    An iterator of strings representing the content.
+    An iterator of the response content, bytestring encoded according to
+    :attr:`HttpResponse.charset`.
 
 .. attribute:: StreamingHttpResponse.status_code
 
@@ -1121,6 +1122,8 @@ Attributes
 
     If ``open_file`` doesn't have a name or if the name of ``open_file`` isn't
     appropriate, provide a custom file name using the ``filename``  parameter.
+    Note that if you pass a file-like object like ``io.BytesIO``, it's your
+    task to ``seek()`` it before passing it to ``FileResponse``.
 
     The ``Content-Length`` and ``Content-Type`` headers are automatically set
     when they can be guessed from contents of ``open_file``.

@@ -2,6 +2,7 @@ import psycopg2
 
 from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import IndexColumns
+from django.db.backends.utils import strip_quotes
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
@@ -67,16 +68,16 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if self._field_data_type(old_field) != self._field_data_type(new_field):
             self.sql_alter_column_type += ' USING %(column)s::%(type)s'
         # Make ALTER TYPE with SERIAL make sense.
-        table = model._meta.db_table
-        if new_type.lower() in ("serial", "bigserial"):
-            column = new_field.column
+        table = strip_quotes(model._meta.db_table)
+        serial_fields_map = {'bigserial': 'bigint', 'serial': 'integer', 'smallserial': 'smallint'}
+        if new_type.lower() in serial_fields_map:
+            column = strip_quotes(new_field.column)
             sequence_name = "%s_%s_seq" % (table, column)
-            col_type = "integer" if new_type.lower() == "serial" else "bigint"
             return (
                 (
                     self.sql_alter_column_type % {
                         "column": self.quote_name(column),
-                        "type": col_type,
+                        "type": serial_fields_map[new_type.lower()],
                     },
                     [],
                 ),

@@ -413,7 +413,6 @@ class Query(BaseExpression):
         """
         if not self.annotation_select:
             return {}
-        has_limit = self.low_mark != 0 or self.high_mark is not None
         existing_annotations = [
             annotation for alias, annotation
             in self.annotations.items()
@@ -430,7 +429,7 @@ class Query(BaseExpression):
         # those operations must be done in a subquery so that the query
         # aggregates on the limit and/or distinct results instead of applying
         # the distinct and limit after the aggregation.
-        if (isinstance(self.group_by, tuple) or has_limit or existing_annotations or
+        if (isinstance(self.group_by, tuple) or self.is_sliced or existing_annotations or
                 self.distinct or self.combinator):
             from django.db.models.sql.subqueries import AggregateQuery
             outer_query = AggregateQuery(self.model)
@@ -438,7 +437,7 @@ class Query(BaseExpression):
             inner_query.select_for_update = False
             inner_query.select_related = False
             inner_query.set_annotation_mask(self.annotation_select)
-            if not has_limit and not self.distinct_fields:
+            if not self.is_sliced and not self.distinct_fields:
                 # Queries with distinct_fields need ordering and when a limit
                 # is applied we must take the slice from the ordered query.
                 # Otherwise no need for ordering.
@@ -548,7 +547,7 @@ class Query(BaseExpression):
         """
         assert self.model == rhs.model, \
             "Cannot combine queries on two different base models."
-        assert self.can_filter(), \
+        assert not self.is_sliced, \
             "Cannot combine queries once a slice has been taken."
         assert self.distinct == rhs.distinct, \
             "Cannot combine a unique query with a non-unique query."
@@ -1055,15 +1054,21 @@ class Query(BaseExpression):
         elif isinstance(value, (list, tuple)):
             # The items of the iterable may be expressions and therefore need
             # to be resolved independently.
+            resolved_values = []
             for sub_value in value:
                 if hasattr(sub_value, 'resolve_expression'):
                     if isinstance(sub_value, F):
-                        sub_value.resolve_expression(
+                        resolved_values.append(sub_value.resolve_expression(
                             self, reuse=can_reuse, allow_joins=allow_joins,
                             simple_col=simple_col,
-                        )
+                        ))
                     else:
-                        sub_value.resolve_expression(self, reuse=can_reuse, allow_joins=allow_joins)
+                        resolved_values.append(sub_value.resolve_expression(
+                            self, reuse=can_reuse, allow_joins=allow_joins,
+                        ))
+                else:
+                    resolved_values.append(sub_value)
+            value = tuple(resolved_values)
         return value
 
     def solve_lookup_type(self, lookup):
@@ -1114,6 +1119,17 @@ class Query(BaseExpression):
             elif hasattr(value, '__iter__'):
                 for v in value:
                     self.check_query_object_type(v, opts, field)
+
+    def check_filterable(self, expression):
+        """Raise an error if expression cannot be used in a WHERE clause."""
+        if not getattr(expression, 'filterable', 'True'):
+            raise NotSupportedError(
+                expression.__class__.__name__ + ' is disallowed in the filter '
+                'clause.'
+            )
+        if hasattr(expression, 'get_source_expressions'):
+            for expr in expression.get_source_expressions():
+                self.check_filterable(expr)
 
     def build_lookup(self, lookups, lhs, rhs):
         """
@@ -1218,11 +1234,7 @@ class Query(BaseExpression):
             raise FieldError("Cannot parse keyword query %r" % arg)
         lookups, parts, reffed_expression = self.solve_lookup_type(arg)
 
-        if not getattr(reffed_expression, 'filterable', True):
-            raise NotSupportedError(
-                reffed_expression.__class__.__name__ + ' is disallowed in '
-                'the filter clause.'
-            )
+        self.check_filterable(reffed_expression)
 
         if not allow_joins and len(parts) > 1:
             raise FieldError("Joined field references are not permitted in this query")
@@ -1230,6 +1242,8 @@ class Query(BaseExpression):
         pre_joins = self.alias_refcount.copy()
         value = self.resolve_lookup_value(value, can_reuse, allow_joins, simple_col)
         used_joins = {k for k, v in self.alias_refcount.items() if v > pre_joins.get(k, 0)}
+
+        self.check_filterable(value)
 
         clause = self.where_class()
         if reffed_expression:
@@ -1762,6 +1776,10 @@ class Query(BaseExpression):
         """Clear any existing limits."""
         self.low_mark, self.high_mark = 0, None
 
+    @property
+    def is_sliced(self):
+        return self.low_mark != 0 or self.high_mark is not None
+
     def has_limit_one(self):
         return self.high_mark is not None and (self.high_mark - self.low_mark) == 1
 
@@ -1771,7 +1789,7 @@ class Query(BaseExpression):
 
         Typically, this means no limits or offsets have been put on the results.
         """
-        return not self.low_mark and self.high_mark is None
+        return not self.is_sliced
 
     def clear_select_clause(self):
         """Remove all fields from SELECT clause."""

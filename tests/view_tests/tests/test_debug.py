@@ -12,11 +12,13 @@ from unittest import mock
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, connection
+from django.http import Http404
 from django.shortcuts import render
 from django.template import TemplateDoesNotExist
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.utils import LoggingCaptureMixin
 from django.urls import path, reverse
+from django.urls.converters import IntConverter
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import mark_safe
 from django.views.debug import (
@@ -237,6 +239,11 @@ class DebugViewTests(SimpleTestCase):
             technical_404_response(mock.MagicMock(), mock.Mock())
             m.assert_called_once_with(encoding='utf-8')
 
+    def test_technical_404_converter_raise_404(self):
+        with mock.patch.object(IntConverter, 'to_python', side_effect=Http404):
+            response = self.client.get('/path-post/1/')
+            self.assertContains(response, 'Page not found', status_code=404)
+
 
 class DebugViewQueriesAllowedTests(SimpleTestCase):
     # May need a query to initialize MySQL connection
@@ -415,9 +422,18 @@ class ExceptionReporterTests(SimpleTestCase):
         self.assertEqual(last_frame['function'], 'funcName')
         self.assertEqual(last_frame['lineno'], 2)
         html = reporter.get_traceback_html()
-        self.assertIn('generated in funcName', html)
+        self.assertIn('generated in funcName, line 2', html)
+        self.assertIn(
+            '"generated", line 2, in funcName\n'
+            '    &lt;source code not available&gt;',
+            html,
+        )
         text = reporter.get_traceback_text()
-        self.assertIn('"generated" in funcName', text)
+        self.assertIn(
+            '"generated", line 2, in funcName\n'
+            '    <source code not available>',
+            text,
+        )
 
     def test_reporting_frames_for_cyclic_reference(self):
         try:
@@ -698,7 +714,7 @@ class PlainTextReportTests(SimpleTestCase):
         self.assertIn('USER: jacob', text)
         self.assertIn('Exception Type:', text)
         self.assertIn('Exception Value:', text)
-        self.assertIn('Traceback:', text)
+        self.assertIn('Traceback (most recent call last):', text)
         self.assertIn('Request information:', text)
         self.assertNotIn('Request data not supplied', text)
 
@@ -717,7 +733,7 @@ class PlainTextReportTests(SimpleTestCase):
         self.assertNotIn('USER:', text)
         self.assertIn('Exception Type:', text)
         self.assertIn('Exception Value:', text)
-        self.assertIn('Traceback:', text)
+        self.assertIn('Traceback (most recent call last):', text)
         self.assertIn('Request data not supplied', text)
 
     def test_no_exception(self):

@@ -182,7 +182,7 @@ class BaseDatabaseSchemaEditor:
             ))
             # Autoincrement SQL (for backends with post table definition
             # variant).
-            if field.get_internal_type() in ('AutoField', 'BigAutoField'):
+            if field.get_internal_type() in ('AutoField', 'BigAutoField', 'SmallAutoField'):
                 autoinc_sql = self.connection.ops.autoinc_sql(model._meta.db_table, field.column)
                 if autoinc_sql:
                     self.deferred_sql.extend(autoinc_sql)
@@ -344,13 +344,13 @@ class BaseDatabaseSchemaEditor:
         self.execute(index.remove_sql(model, self))
 
     def add_constraint(self, model, constraint):
-        """Add a check constraint to a model."""
+        """Add a constraint to a model."""
         sql = constraint.create_sql(model, self)
         if sql:
             self.execute(sql)
 
     def remove_constraint(self, model, constraint):
-        """Remove a check constraint from a model."""
+        """Remove a constraint from a model."""
         sql = constraint.remove_sql(model, self)
         if sql:
             self.execute(sql)

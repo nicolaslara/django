@@ -2436,6 +2436,11 @@ class QuerySetSupportsPythonIdioms(TestCase):
         with self.assertRaisesMessage(AssertionError, "Negative indexing is not supported."):
             Article.objects.all()[0:-5]
 
+    def test_invalid_index(self):
+        msg = 'QuerySet indices must be integers or slices, not str.'
+        with self.assertRaisesMessage(TypeError, msg):
+            Article.objects.all()['foo']
+
     def test_can_get_number_of_items_in_queryset_using_standard_len(self):
         self.assertEqual(len(Article.objects.filter(name__exact='Article 1')), 1)
 
@@ -3848,7 +3853,7 @@ class TestTicket24279(TestCase):
 
 class TestInvalidValuesRelation(SimpleTestCase):
     def test_invalid_values(self):
-        msg = "invalid literal for int() with base 10: 'abc'"
+        msg = "Field 'id' expected a number but got 'abc'."
         with self.assertRaisesMessage(ValueError, msg):
             Annotation.objects.filter(tag='abc')
         with self.assertRaisesMessage(ValueError, msg):

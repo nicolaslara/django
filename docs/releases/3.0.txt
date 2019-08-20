@@ -133,6 +133,11 @@ Minor features
 * Added support for the ``furlong`` unit in
   :class:`~django.contrib.gis.measure.Distance`.
 
+* The :setting:`GEOIP_PATH` setting now supports :class:`pathlib.Path`.
+
+* The :class:`~django.contrib.gis.geoip2.GeoIP2` class now accepts
+  :class:`pathlib.Path` ``path``.
+
 :mod:`django.contrib.messages`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -250,6 +255,10 @@ Management Commands
 * The new :option:`--skip-checks` option skips running system checks prior to
   running the command.
 
+* The :option:`startapp --template` and :option:`startproject --template`
+  options now support templates stored in XZ archives (``.tar.xz``, ``.txz``)
+  and LZMA archives (``.tar.lzma``, ``.tlz``).
+
 Migrations
 ~~~~~~~~~~
 
@@ -282,6 +291,26 @@ Models
   :class:`~django.db.models.UniqueConstraint`, and
   :class:`~django.db.models.Index` now support app label and class
   interpolation using the ``'%(app_label)s'`` and ``'%(class)s'`` placeholders.
+
+* The new :attr:`.Field.descriptor_class` attribute allows model fields to
+  customize the get and set behavior by overriding their
+  :py:ref:`descriptors <descriptors>`.
+
+* :class:`~django.db.models.Avg` and :class:`~django.db.models.Sum` now support
+  the ``distinct`` argument.
+
+* Added :class:`~django.db.models.SmallAutoField` which acts much like an
+  :class:`~django.db.models.AutoField` except that it only allows values under
+  a certain (database-dependent) limit. Values from ``1`` to ``32767`` are safe
+  in all databases supported by Django.
+
+* :class:`~django.db.models.AutoField`,
+  :class:`~django.db.models.BigAutoField`, and
+  :class:`~django.db.models.SmallAutoField` now inherit from
+  ``IntegerField``, ``BigIntegerField`` and ``SmallIntegerField`` respectively.
+  System checks and validators are now also properly inherited.
+
+* :attr:`.FileField.upload_to` now supports :class:`pathlib.Path`.
 
 Requests and Responses
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -332,6 +361,9 @@ Tests
 * Django test runner now supports ``--start-at`` and ``--start-after`` options
   to run tests starting from a specific top-level module.
 
+* Django test runner now supports a ``--pdb`` option to spawn a debugger at
+  each error or failure.
+
 URLs
 ~~~~
 
@@ -375,6 +407,11 @@ backends.
 
 * ``DatabaseOperations.return_insert_id()`` now requires an additional
   ``field`` argument with the model field.
+
+* Entries for ``AutoField``, ``BigAutoField``, and ``SmallAutoField`` are added
+  to  ``DatabaseOperations.integer_field_ranges`` to support the integer range
+  validators on these field types. Third-party backends may need to customize
+  the default entries.
 
 :mod:`django.contrib.admin`
 ---------------------------
@@ -485,6 +522,21 @@ Miscellaneous
 
 * ``intword`` template filter now translates ``1.0`` as a singular phrase and
   all other numeric values as plural. This may be incorrect for some languages.
+
+* Assigning a value to a model's :class:`~django.db.models.ForeignKey` or
+  :class:`~django.db.models.OneToOneField` ``'_id'`` attribute now unsets the
+  corresponding field. Accessing the field afterwards will result in a query.
+
+* :func:`~django.utils.cache.patch_vary_headers` now handles an asterisk
+  ``'*'`` according to :rfc:`7231#section-7.1.4`, i.e. if a list of header
+  field names contains an asterisk, then the ``Vary`` header will consist of a
+  single asterisk ``'*'``.
+
+* :setting:`SECURE_CONTENT_TYPE_NOSNIFF` setting now defaults to ``True``. With
+  the enabled :setting:`SECURE_CONTENT_TYPE_NOSNIFF`, the
+  :class:`~django.middleware.security.SecurityMiddleware` sets the
+  :ref:`x-content-type-options` header on all responses that do not already
+  have it.
 
 .. _deprecated-features-3.0:
 

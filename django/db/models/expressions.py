@@ -366,6 +366,13 @@ class BaseExpression:
             if expr:
                 yield from expr.flatten()
 
+    def select_format(self, compiler, sql, params):
+        """
+        Custom format for select clauses. For example, EXISTS expressions need
+        to be wrapped in CASE WHEN on Oracle.
+        """
+        return self.output_field.select_format(compiler, sql, params)
+
     @cached_property
     def identity(self):
         constructor_signature = inspect.signature(self.__init__)
@@ -492,16 +499,14 @@ class TemporalSubtraction(CombinedExpression):
 
     def as_sql(self, compiler, connection):
         connection.ops.check_expression_support(self)
-        lhs = compiler.compile(self.lhs, connection)
-        rhs = compiler.compile(self.rhs, connection)
+        lhs = compiler.compile(self.lhs)
+        rhs = compiler.compile(self.rhs)
         return connection.ops.subtract_temporals(self.lhs.output_field.get_internal_type(), lhs, rhs)
 
 
 @deconstructible
 class F(Combinable):
     """An object capable of resolving references to existing query objects."""
-    # Can the expression be used in a WHERE clause?
-    filterable = True
 
     def __init__(self, name):
         """
@@ -1070,12 +1075,11 @@ class Exists(Subquery):
             sql = 'NOT {}'.format(sql)
         return sql, params
 
-    def as_oracle(self, compiler, connection, template=None, **extra_context):
-        # Oracle doesn't allow EXISTS() in the SELECT list, so wrap it with a
-        # CASE WHEN expression. Change the template since the When expression
-        # requires a left hand side (column) to compare against.
-        sql, params = self.as_sql(compiler, connection, template, **extra_context)
-        sql = 'CASE WHEN {} THEN 1 ELSE 0 END'.format(sql)
+    def select_format(self, compiler, sql, params):
+        # Wrap EXISTS() with a CASE WHEN expression if a database backend
+        # (e.g. Oracle) doesn't support boolean expression in the SELECT list.
+        if not compiler.connection.features.supports_boolean_expr_in_select_clause:
+            sql = 'CASE WHEN {} THEN 1 ELSE 0 END'.format(sql)
         return sql, params
 
 
@@ -1134,6 +1138,19 @@ class OrderBy(BaseExpression):
         elif self.nulls_first:
             template = 'IF(ISNULL(%(expression)s),0,1), %(expression)s %(ordering)s '
         return self.as_sql(compiler, connection, template=template)
+
+    def as_oracle(self, compiler, connection):
+        # Oracle doesn't allow ORDER BY EXISTS() unless it's wrapped in
+        # a CASE WHEN.
+        if isinstance(self.expression, Exists):
+            copy = self.copy()
+            # XXX: Use Case(When(self.lhs)) once support for boolean
+            # expressions is added to When.
+            exists_sql, params = compiler.compile(self.expression)
+            case_sql = 'CASE WHEN %s THEN 1 ELSE 0 END' % exists_sql
+            copy.expression = RawSQL(case_sql, params)
+            return copy.as_sql(compiler, connection)
+        return self.as_sql(compiler, connection)
 
     def get_group_by_cols(self, alias=None):
         cols = []
