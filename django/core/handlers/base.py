@@ -135,7 +135,9 @@ class BaseHandler:
         if response is None:
             wrapped_callback = self.make_view_atomic(callback)
             # If it is a synchronous view, run it in a subthread
-            if not asyncio.iscoroutinefunction(wrapped_callback):
+            is_async = (asyncio.iscoroutinefunction(wrapped_callback) or
+                        asyncio.iscoroutinefunction(getattr(wrapped_callback, '__call__', None)))
+            if not is_async:
                 wrapped_callback = sync_to_async(wrapped_callback, thread_sensitive=True)
             try:
                 response = await wrapped_callback(request, *callback_args, **callback_kwargs)

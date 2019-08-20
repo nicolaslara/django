@@ -282,3 +282,10 @@ class AsyncClassView(View):
         import asyncio
         await asyncio.sleep(0)
         return HttpResponse()
+
+
+class AsyncClassCustomView:
+    async def __call__(self, *args, **kwargs):
+        import asyncio
+        await asyncio.sleep(0)
+        return HttpResponse()

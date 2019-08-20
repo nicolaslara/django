@@ -47,4 +47,5 @@ urlpatterns += [
 urlpatterns += [
     path('async/simple/', views.async_view),
     path('async/class/', views.AsyncClassView.as_view()),
+    path('async/custom_class/', views.AsyncClassCustomView()),
 ]
