@@ -49,10 +49,11 @@ class View:
         non_async_parents = [
             parent for parent in cls.__mro__
             if parent.__dict__.get("async_enabled", False) is False
+               and parent != object
         ]
         if non_async_parents:
             raise TypeError("You tried to create the async-capable class %s, "
-                            "but not all of its base classes are async-capable: "
+                            "but not all of its base classes are async-capable: %s"
                             % (cls.__name__, ', '.join(parent.__name__ for parent in non_async_parents)))
         super().__init_subclass__()
         View.dispatch = View.async_dispatch

@@ -269,3 +269,16 @@ def json_response_view(request):
         'timestamp': datetime.datetime(2013, 5, 19, 20),
         'value': decimal.Decimal('3.14'),
     })
+
+
+async def async_view(request):
+    import asyncio
+    await asyncio.sleep(0)
+    return HttpResponse()
+
+
+class AsyncClassView(View):
+    async def get(self, request):
+        import asyncio
+        await asyncio.sleep(0)
+        return HttpResponse()
