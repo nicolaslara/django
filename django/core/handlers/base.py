@@ -93,10 +93,7 @@ class BaseHandler:
             if current_async == next_async or not next_async:
                 handler = convert_exception_to_response(mw_instance)
             else:
-                if next_async:
-                    handler = convert_exception_to_response(sync_to_async(mw_instance, thread_sensitive=True))
-                else:
-                    handler = convert_exception_to_response(mw_instance)
+                handler = convert_exception_to_response(sync_to_async(mw_instance, thread_sensitive=True))
 
         # We only assign to this when initialization is complete as it is used
         # as a flag for initialization being complete.
