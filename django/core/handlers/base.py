@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import types
+from itertools import zip_longest
 
 from asgiref.sync import async_to_sync, sync_to_async
 
@@ -34,31 +35,28 @@ class BaseHandler:
         self._exception_middleware = []
 
         handler = convert_exception_to_response(self._get_response)
-        sync_context = True
-        context = []
-        for middleware_path in reversed(settings.MIDDLEWARE):
+        iter1, iter2 = reversed(settings.MIDDLEWARE), reversed(settings.MIDDLEWARE)
+        next(iter2, None)
+        for middleware_path, lookahead_path in zip_longest(iter1, iter2):
             middleware = import_string(middleware_path)
-            if getattr(middleware, "_is_async", False):
-                sync_context = False
-            else:
-                sync_context = True
-            context.append(sync_context)
+            lookahead = None
+            if lookahead_path:
+                lookahead = import_string(lookahead_path)
 
-        prev = None
-        for i, middleware_path in enumerate(reversed(settings.MIDDLEWARE)):
-            middleware = import_string(middleware_path)
+            prev_async = asyncio.iscoroutinefunction(handler)
+            current_async = getattr(middleware, "_is_async", False)
+            next_async = getattr(lookahead, "_is_async", False) if lookahead else True
 
             try:
-                if prev and sync_context and not getattr(middleware, "_is_async", False):
+                if prev_async == current_async:
                     mw_instance = middleware(handler)
-                elif getattr(middleware, "_is_async", False):
-                    mw_instance = middleware(handler)
-                    sync_context = False
                 else:
-                    if settings.DEBUG:
-                        logger.debug('Synchronous middleware adapted: %r', middleware_path)
-                    sync_context = True
-                    mw_instance = middleware(async_to_sync(handler))
+                    if prev_async:
+                        mw_instance = middleware(async_to_sync(handler))
+                    else:
+                        if settings.DEBUG:
+                            logger.debug('Synchronous middleware adapted: %r', middleware_path)
+                        mw_instance = middleware(sync_to_async(handler))
             except MiddlewareNotUsed as exc:
                 if settings.DEBUG:
                     if str(exc):
@@ -71,8 +69,6 @@ class BaseHandler:
                 raise ImproperlyConfigured(
                     'Middleware factory %s returned None.' % middleware_path
                 )
-
-            prev = middleware_path
 
             if hasattr(mw_instance, 'process_view'):
                 if asyncio.iscoroutinefunction(mw_instance.process_view):
@@ -94,12 +90,13 @@ class BaseHandler:
                         sync_to_async(mw_instance.process_exception, thread_sensitive=True)
                     )
 
-            next_context = len(context) > i+1 and context[i+1] or False
-
-            if asyncio.iscoroutinefunction(mw_instance) or (sync_context and next_context):
+            if current_async == next_async or not next_async:
                 handler = convert_exception_to_response(mw_instance)
             else:
-                handler = convert_exception_to_response(sync_to_async(mw_instance, thread_sensitive=True))
+                if next_async:
+                    handler = convert_exception_to_response(sync_to_async(mw_instance, thread_sensitive=True))
+                else:
+                    handler = convert_exception_to_response(mw_instance)
 
         # We only assign to this when initialization is complete as it is used
         # as a flag for initialization being complete.
