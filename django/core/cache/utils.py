@@ -1,5 +1,6 @@
 import hashlib
 import inspect
+
 from urllib.parse import quote
 
 from asgiref.sync import sync_to_async
@@ -23,12 +24,22 @@ def auto_async(func):
         return await sync_to_async(func)(*args, **kwargs)
 
     def inner(*args, **kwargs):
-        # Initial experiment with frame hacks. This needs to be expended for many possible use cases
-        parent_frame = inspect.getouterframes(inspect.currentframe())[1]
-        if parent_frame.frame.f_code.co_flags & (
-            inspect.CO_COROUTINE | inspect.CO_ITERABLE_COROUTINE | inspect.CO_ASYNC_GENERATOR
-        ):
-            return async_wrapper(*args, **kwargs)
+        # Initial experiment with frame hacks.
+        # This needs to be expended for other possible use cases.
+        #
+        # This may also break easily. What happens if the parent wants a
+        # coroutine to later pass it around?
+        outer_frames = inspect.getouterframes(inspect.currentframe())
+        try:
+            parent_frame = outer_frames[1]
+            if parent_frame.frame.f_code.co_flags & (
+                inspect.CO_COROUTINE |
+                inspect.CO_ITERABLE_COROUTINE |
+                inspect.CO_ASYNC_GENERATOR):
+                return async_wrapper(*args, **kwargs)
+        except IndexError:
+            pass  # No outer frames
+
         return sync_wrapper(*args, **kwargs)
 
     return inner
