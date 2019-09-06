@@ -8,6 +8,8 @@ from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
 
 # Global in-memory store of cache data. Keyed by name, to provide
 # multiple named local memory caches.
+from django.utils.asyncio import auto_async, async_unsafe
+
 _caches = {}
 _expire_info = {}
 _locks = {}
@@ -22,6 +24,7 @@ class LocMemCache(BaseCache):
         self._expire_info = _expire_info.setdefault(name, {})
         self._lock = _locks.setdefault(name, Lock())
 
+    @async_unsafe
     def add(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
         key = self.make_key(key, version=version)
         self.validate_key(key)
@@ -32,7 +35,10 @@ class LocMemCache(BaseCache):
                 return True
             return False
 
+    @auto_async
     def get(self, key, default=None, version=None):
+        import time
+        time.sleep(2)
         key = self.make_key(key, version=version)
         self.validate_key(key)
         with self._lock:
@@ -43,6 +49,7 @@ class LocMemCache(BaseCache):
             self._cache.move_to_end(key, last=False)
         return pickle.loads(pickled)
 
+    @async_unsafe
     def _set(self, key, value, timeout=DEFAULT_TIMEOUT):
         if len(self._cache) >= self._max_entries:
             self._cull()
@@ -50,6 +57,7 @@ class LocMemCache(BaseCache):
         self._cache.move_to_end(key, last=False)
         self._expire_info[key] = self.get_backend_timeout(timeout)
 
+    @auto_async
     def set(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
         key = self.make_key(key, version=version)
         self.validate_key(key)
@@ -57,6 +65,7 @@ class LocMemCache(BaseCache):
         with self._lock:
             self._set(key, pickled, timeout)
 
+    @async_unsafe
     def touch(self, key, timeout=DEFAULT_TIMEOUT, version=None):
         key = self.make_key(key, version=version)
         with self._lock:
@@ -65,6 +74,7 @@ class LocMemCache(BaseCache):
             self._expire_info[key] = self.get_backend_timeout(timeout)
             return True
 
+    @async_unsafe
     def incr(self, key, delta=1, version=None):
         key = self.make_key(key, version=version)
         self.validate_key(key)
@@ -80,6 +90,7 @@ class LocMemCache(BaseCache):
             self._cache.move_to_end(key, last=False)
         return new_value
 
+    @async_unsafe
     def has_key(self, key, version=None):
         key = self.make_key(key, version=version)
         self.validate_key(key)
@@ -89,10 +100,12 @@ class LocMemCache(BaseCache):
                 return False
             return True
 
+    @async_unsafe
     def _has_expired(self, key):
         exp = self._expire_info.get(key, -1)
         return exp is not None and exp <= time.time()
 
+    @async_unsafe
     def _cull(self):
         if self._cull_frequency == 0:
             self._cache.clear()
@@ -103,6 +116,7 @@ class LocMemCache(BaseCache):
                 key, _ = self._cache.popitem()
                 del self._expire_info[key]
 
+    @async_unsafe
     def _delete(self, key):
         try:
             del self._cache[key]
@@ -110,12 +124,14 @@ class LocMemCache(BaseCache):
         except KeyError:
             pass
 
+    @async_unsafe
     def delete(self, key, version=None):
         key = self.make_key(key, version=version)
         self.validate_key(key)
         with self._lock:
             self._delete(key)
 
+    @async_unsafe
     def clear(self):
         with self._lock:
             self._cache.clear()
