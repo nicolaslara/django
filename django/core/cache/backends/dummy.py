@@ -1,6 +1,7 @@
 "Dummy cache backend"
 
 from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
+from django.core.cache.utils import auto_async
 
 
 class DummyCache(BaseCache):
@@ -12,7 +13,9 @@ class DummyCache(BaseCache):
         self.validate_key(key)
         return True
 
+    @auto_async
     def get(self, key, default=None, version=None):
+        import ipdb; ipdb.set_trace()
         key = self.make_key(key, version=version)
         self.validate_key(key)
         return default
