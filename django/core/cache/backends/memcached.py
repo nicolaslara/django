@@ -207,29 +207,28 @@ class PyLibMCCache(BaseMemcachedCache):
         pass
 
 
-class AiomcacheCache(BaseMemcachedCache):
-    "An implementation of a cache binding using aiomcachecache"
+class AioMemcacheCache(BaseMemcachedCache):
+    "An implementation of a cache binding using aiocache"
     def __init__(self, server, params):
-        import aiomcache
-        super().__init__(server, params, library=aiomcache, value_not_found_exception=ValueError)
+        import aiocache
+        super().__init__(server, params, library=aiocache.MemcachedCache,
+                         value_not_found_exception=ValueError)
 
     @property
     def _cache(self):
         if getattr(self, '_client', None) is None:
+            from aiocache.serializers import PickleSerializer
             host, port = self._servers[0].split(':')
-            self._client = self._lib.Client(host, port)
+            self._client = self._lib(
+                endpoint=host, port=port, serializer=PickleSerializer())
         return self._client
 
     async def get(self, key, default=None, version=None):
-        key = self.make_key(key, version=version).encode()
-        pickled = await self._cache.get(key)
-        if pickled is None:
-            return default
-        return pickle.loads(pickled)
+        key = self.make_key(key, version=version)
+        return await self._cache.get(key, default=default)
 
     async def set(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
-        key = self.make_key(key, version=version).encode()
-        pickled = pickle.dumps(value, pickle.HIGHEST_PROTOCOL)
-        if not await self._cache.set(key, pickled, self.get_backend_timeout(timeout)):
+        key = self.make_key(key, version=version)
+        if not await self._cache.set(key, value, self.get_backend_timeout(timeout)):
             # make sure the key doesn't keep its old value in case of failure to set (memcached's 1MB limit)
             await self._cache.delete(key)
