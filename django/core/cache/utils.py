@@ -25,7 +25,9 @@ def auto_async(func):
     def inner(*args, **kwargs):
         # Initial experiment with frame hacks. This needs to be expended for many possible use cases
         parent_frame = inspect.getouterframes(inspect.currentframe())[1]
-        if parent_frame.frame.f_code.co_flags & inspect.CO_COROUTINE:
+        if parent_frame.frame.f_code.co_flags & (
+            inspect.CO_COROUTINE | inspect.CO_ITERABLE_COROUTINE | inspect.CO_ASYNC_GENERATOR
+        ):
             return async_wrapper(*args, **kwargs)
         return sync_wrapper(*args, **kwargs)
 

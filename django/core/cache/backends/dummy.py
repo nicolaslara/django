@@ -15,7 +15,6 @@ class DummyCache(BaseCache):
 
     @auto_async
     def get(self, key, default=None, version=None):
-        import ipdb; ipdb.set_trace()
         key = self.make_key(key, version=version)
         self.validate_key(key)
         return default
