@@ -29,7 +29,13 @@ def auto_async(func):
         #
         # This may also break easily. What happens if the parent wants a
         # coroutine to later pass it around?
-        outer_frames = inspect.getouterframes(inspect.currentframe())
+        try:
+            outer_frames = inspect.getouterframes(inspect.currentframe())
+        except IndexError:
+            # I'm not sure if this only happens on ipython, but for now
+            # forcing async here helps me debug
+            # ToDo: Review this.
+            return async_wrapper(*args, **kwargs)
         try:
             parent_frame = outer_frames[1]
             if parent_frame.frame.f_code.co_flags & (
