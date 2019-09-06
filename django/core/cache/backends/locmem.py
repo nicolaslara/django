@@ -37,8 +37,6 @@ class LocMemCache(BaseCache):
 
     @auto_async
     def get(self, key, default=None, version=None):
-        import time
-        time.sleep(2)
         key = self.make_key(key, version=version)
         self.validate_key(key)
         with self._lock:
