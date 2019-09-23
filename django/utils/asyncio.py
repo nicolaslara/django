@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import inspect
+import types
 
 from asgiref.sync import sync_to_async
 from django.core.exceptions import SynchronousOnlyOperation
@@ -33,6 +34,27 @@ def async_unsafe(message):
     else:
         return decorator
 
+class AutoAsync(object):
+    def __init__(self, f):
+        self.func = f
+
+    def sync_wrapper(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+    async def async_wrapper(self, *args, **kwargs):
+        return await sync_to_async(self.func)(*args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        return self.sync_wrapper(*args, **kwargs)
+
+    def __get__(self, instance, owner):
+        from functools import partial
+
+        self.bound = functools.wraps(self.func)(partial(self.__call__, instance))
+        self.bound.sync = functools.wraps(self.func)(partial(self.__call__, instance))
+        return self.bound
+
+
 
 def auto_async(func):
     """
@@ -46,6 +68,7 @@ def auto_async(func):
     async def async_wrapper(*args, **kwargs):
         return await sync_to_async(func)(*args, **kwargs)
 
+    @functools.wraps(func)
     def inner(*args, **kwargs):
         # Initial experiment with frame hacks.
         # This needs to be expended for other possible use cases.
@@ -70,5 +93,10 @@ def auto_async(func):
             pass  # No outer frames
 
         return sync_wrapper(*args, **kwargs)
+
+    inner.sync = sync_wrapper
+    inner.async_ = async_wrapper
+
+    #inspect.ismethod
 
     return inner
