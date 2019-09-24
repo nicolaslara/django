@@ -3,7 +3,7 @@ import functools
 import inspect
 import types
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import sync_to_async, async_to_sync
 from django.core.exceptions import SynchronousOnlyOperation
 
 
@@ -34,29 +34,55 @@ def async_unsafe(message):
     else:
         return decorator
 
+
 class AutoAsync(object):
     def __init__(self, f):
-        self.func = f
-
-    def sync_wrapper(self, *args, **kwargs):
-        return self.func(*args, **kwargs)
-
-    async def async_wrapper(self, *args, **kwargs):
-        return await sync_to_async(self.func)(*args, **kwargs)
+        self.as_defined = f
+        if asyncio.iscoroutinefunction(f):
+            self.as_async = f
+            self.as_sync = async_to_sync(f)
+        else:
+            self.as_async = sync_to_async(f)
+            self.as_sync = f
 
     def __call__(self, *args, **kwargs):
-        return self.sync_wrapper(*args, **kwargs)
+        # Initial experiment with frame hacks.
+        # This needs to be expended for other possible use cases.
+        #
+        # This may also break easily. What happens if the parent wants a
+        # coroutine to later pass it around?
+        try:
+            outer_frames = inspect.getouterframes(inspect.currentframe())
+        except IndexError:
+            # I'm not sure if this only happens on ipython, but for now
+            # forcing async here helps me debug
+            # ToDo: Review this.
+            return self.as_async(*args, **kwargs)
+        try:
+            parent_frame = outer_frames[1]
+            if parent_frame.frame.f_code.co_flags & (
+                inspect.CO_COROUTINE |
+                inspect.CO_ITERABLE_COROUTINE |
+                inspect.CO_ASYNC_GENERATOR):
+                return self.as_async(*args, **kwargs)
+        except IndexError:
+            pass  # No outer frames
+
+        return self.as_sync(*args, **kwargs)
 
     def __get__(self, instance, owner):
         from functools import partial
-
-        self.bound = functools.wraps(self.func)(partial(self.__call__, instance))
-        self.bound.sync = functools.wraps(self.func)(partial(self.__call__, instance))
-        return self.bound
-
+        bound = functools.wraps(self.as_defined)(partial(self.__call__, instance))
+        bound.as_sync = functools.wraps(self.as_defined)(partial(self.as_sync, instance))
+        bound.as_async = functools.wraps(self.as_defined)(partial(self.as_async, instance))
+        return bound
 
 
 def auto_async(func):
+    return functools.wraps(func)(AutoAsync(func))
+
+
+def auto_async_old(func):
     """
     Decorator to automatically convert a sync function to async depending on
     the calling context.

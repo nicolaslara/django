@@ -8,7 +8,7 @@ from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
 
 # Global in-memory store of cache data. Keyed by name, to provide
 # multiple named local memory caches.
-from django.utils.asyncio import auto_async, async_unsafe, AutoAsync
+from django.utils.asyncio import auto_async, async_unsafe
 
 _caches = {}
 _expire_info = {}
