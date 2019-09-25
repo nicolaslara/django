@@ -35,6 +35,13 @@ def async_unsafe(message):
         return decorator
 
 
+def bind(func, instance):
+    """Replacement for partial so that the function signature is preserved"""
+    def inner(*args, **kwargs):
+        return func(instance, *args, **kwargs)
+    return inner
+
+
 class AutoAsync(object):
     def __init__(self, f):
         self.as_defined = f
@@ -71,10 +78,9 @@ class AutoAsync(object):
         return self.as_sync(*args, **kwargs)
 
     def __get__(self, instance, owner):
-        from functools import partial
-        bound = functools.wraps(self.as_defined)(partial(self.__call__, instance))
-        bound.as_sync = functools.wraps(self.as_defined)(partial(self.as_sync, instance))
-        bound.as_async = functools.wraps(self.as_defined)(partial(self.as_async, instance))
+        bound = functools.wraps(self.as_defined)(bind(self.__call__, instance))
+        bound.as_sync = functools.wraps(self.as_defined)(bind(self.as_sync, instance))
+        bound.as_async = functools.wraps(self.as_defined)(bind(self.as_async, instance))
         return bound
 
     def async_function(self, func):
