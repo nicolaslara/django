@@ -77,6 +77,14 @@ class AutoAsync(object):
         bound.as_async = functools.wraps(self.as_defined)(partial(self.as_async, instance))
         return bound
 
+    def async_function(self, func):
+        self.as_async = func
+        return func
+
+    def sync_function(self, func):
+        self.as_sync = func
+        return func
+
 
 def auto_async(func):
     return functools.wraps(func)(AutoAsync(func))
