@@ -287,11 +287,15 @@ class BaseCache:
         pass
 
 
-class BaseAioCache(BaseCache):
-    "An implementation of a cache binding using aiocache"
-    def __init__(self, server, params):
-        super().__init__(server, params, library=self.get_library_class(),
-                         value_not_found_exception=ValueError)
+class BaseAioCacheMixin(BaseCache):
+    "A mixin for generating cache bindings using aiocache"
+    @property
+    def library(self):
+        return NotImplemented
+
+    @property
+    def endpoint(self):
+        return NotImplemented
 
     def get_library_class(self):
         raise NotImplementedError('subclasses of BaseAioCache must implement a get_library_class method that returns a backend supported by aiocache')
@@ -303,9 +307,10 @@ class BaseAioCache(BaseCache):
     @property
     def _cache(self):
         if getattr(self, '_client', None) is None:
-            host, port = self._servers[0].split(':')
-            self._client = self._lib(endpoint=host, port=port,
-                                     serializer=self.get_serializer_class()())
+            host, port = self.endpoint
+            self._client = self.library(
+                endpoint=host, port=port,
+                serializer=self.get_serializer_class()())
         return self._client
 
     async def get(self, key, default=None, version=None):

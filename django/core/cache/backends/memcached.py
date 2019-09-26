@@ -4,7 +4,8 @@ import pickle
 import re
 import time
 
-from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache, BaseAioCache
+from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache, \
+    BaseAioCacheMixin
 from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 
@@ -197,8 +198,21 @@ class PyLibMCCache(BaseMemcachedCache):
         pass
 
 
-class AioMemcachedCache(BaseAioCache, BaseMemcachedCache):
+class AioMemcachedCache(BaseAioCacheMixin, BaseMemcachedCache):
     "An implementation of an async (mem)cache binding using aiocache"
+    def __init__(self, server, params):
+        super().__init__(
+            server, params, library=self.get_library_class(),
+            value_not_found_exception=ValueError)
+
     def get_library_class(self):
         import aiocache
         return aiocache.MemcachedCache
+
+    @property
+    def endpoint(self):
+        return self._servers[0].split(':')
+
+    @property
+    def library(self):
+        return self._lib
