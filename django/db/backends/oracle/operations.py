@@ -6,6 +6,8 @@ from functools import lru_cache
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
 from django.db.backends.utils import strip_quotes, truncate_name
+from django.db.models.expressions import Exists, ExpressionWrapper
+from django.db.models.query_utils import Q
 from django.db.utils import DatabaseError
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
@@ -16,13 +18,18 @@ from .utils import BulkInsertMapper, InsertVar, Oracle_datetime
 
 
 class DatabaseOperations(BaseDatabaseOperations):
-    # Oracle uses NUMBER(11) and NUMBER(19) for integer fields.
+    # Oracle uses NUMBER(5), NUMBER(11), and NUMBER(19) for integer fields.
+    # SmallIntegerField uses NUMBER(11) instead of NUMBER(5), which is used by
+    # SmallAutoField, to preserve backward compatibility.
     integer_field_ranges = {
         'SmallIntegerField': (-99999999999, 99999999999),
         'IntegerField': (-99999999999, 99999999999),
         'BigIntegerField': (-9999999999999999999, 9999999999999999999),
         'PositiveSmallIntegerField': (0, 99999999999),
         'PositiveIntegerField': (0, 99999999999),
+        'SmallAutoField': (-99999, 99999),
+        'AutoField': (-99999999999, 99999999999),
+        'BigAutoField': (-9999999999999999999, 9999999999999999999),
     }
     set_operators = {**BaseDatabaseOperations.set_operators, 'difference': 'MINUS'}
 
@@ -241,17 +248,19 @@ END;
     def deferrable_sql(self):
         return " DEFERRABLE INITIALLY DEFERRED"
 
-    def fetch_returned_insert_id(self, cursor):
-        value = cursor._insert_id_var.getvalue()
-        if value is None or value == []:
-            # cx_Oracle < 6.3 returns None, >= 6.3 returns empty list.
-            raise DatabaseError(
-                'The database did not return a new row id. Probably "ORA-1403: '
-                'no data found" was raised internally but was hidden by the '
-                'Oracle OCI library (see https://code.djangoproject.com/ticket/28859).'
-            )
-        # cx_Oracle < 7 returns value, >= 7 returns list with single value.
-        return value[0] if isinstance(value, list) else value
+    def fetch_returned_insert_columns(self, cursor, returning_params):
+        for param in returning_params:
+            value = param.get_value()
+            if value is None or value == []:
+                # cx_Oracle < 6.3 returns None, >= 6.3 returns empty list.
+                raise DatabaseError(
+                    'The database did not return a new row id. Probably '
+                    '"ORA-1403: no data found" was raised internally but was '
+                    'hidden by the Oracle OCI library (see '
+                    'https://code.djangoproject.com/ticket/28859).'
+                )
+            # cx_Oracle < 7 returns value, >= 7 returns list with single value.
+            yield value[0] if isinstance(value, list) else value
 
     def field_cast_sql(self, db_type, internal_type):
         if db_type and db_type.endswith('LOB'):
@@ -334,8 +343,21 @@ END;
             match_option = "'i'"
         return 'REGEXP_LIKE(%%s, %%s, %s)' % match_option
 
-    def return_insert_id(self, field):
-        return 'RETURNING %s INTO %%s', (InsertVar(field),)
+    def return_insert_columns(self, fields):
+        if not fields:
+            return '', ()
+        field_names = []
+        params = []
+        for field in fields:
+            field_names.append('%s.%s' % (
+                self.quote_name(field.model._meta.db_table),
+                self.quote_name(field.column),
+            ))
+            params.append(InsertVar(field))
+        return 'RETURNING %s INTO %s' % (
+            ', '.join(field_names),
+            ', '.join(['%s'] * len(params)),
+        ), tuple(params)
 
     def __foreign_key_constraints(self, table_name, recursive):
         with self.connection.cursor() as cursor:
@@ -602,3 +624,14 @@ END;
         if fields:
             return self.connection.features.max_query_params // len(fields)
         return len(objs)
+
+    def conditional_expression_supported_in_where_clause(self, expression):
+        """
+        Oracle supports only EXISTS(...) or filters in the WHERE clause, others
+        must be compared with True.
+        """
+        if isinstance(expression, Exists):
+            return True
+        if isinstance(expression, ExpressionWrapper) and isinstance(expression.expression, Q):
+            return True
+        return False

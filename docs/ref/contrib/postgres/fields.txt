@@ -24,7 +24,7 @@ may be a good choice for the :ref:`range fields <range-fields>` and
 
 .. class:: ArrayField(base_field, size=None, **options)
 
-    A field for storing lists of data. Most field types can be used, you simply
+    A field for storing lists of data. Most field types can be used, and you
     pass another field instance as the :attr:`base_field
     <ArrayField.base_field>`. You may also specify a :attr:`size
     <ArrayField.size>`. ``ArrayField`` can be nested to store multi-dimensional
@@ -284,7 +284,7 @@ transform do not change. For example::
     similar to PostgreSQL's ``text`` type.
 
     .. _citext: https://www.postgresql.org/docs/current/citext.html
-    .. _the performance considerations: https://www.postgresql.org/docs/current/citext.html#AEN178177
+    .. _the performance considerations: https://www.postgresql.org/docs/current/citext.html#id-1.11.7.17.7
 
 ``HStoreField``
 ===============
@@ -333,7 +333,7 @@ We will use the following example model::
 Key lookups
 ~~~~~~~~~~~
 
-To query based on a given key, you simply use that key as the lookup name::
+To query based on a given key, you can use that key as the lookup name::
 
     >>> Dog.objects.create(name='Rufus', data={'breed': 'labrador'})
     >>> Dog.objects.create(name='Meg', data={'breed': 'collie'})
@@ -537,8 +537,7 @@ We will use the following example model::
 Key, index, and path lookups
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To query based on a given dictionary key, simply use that key as the lookup
-name::
+To query based on a given dictionary key, use that key as the lookup name::
 
     >>> Dog.objects.create(name='Rufus', data={
     ...     'breed': 'labrador',
@@ -657,25 +656,10 @@ excluded; that is, ``[)``.
 
 .. class:: DecimalRangeField(**options)
 
-    .. versionadded:: 2.2
-
     Stores a range of floating point values. Based on a
     :class:`~django.db.models.DecimalField`. Represented by a ``numrange`` in
     the database and a :class:`~psycopg2:psycopg2.extras.NumericRange` in
     Python.
-
-``FloatRangeField``
--------------------
-
-.. class:: FloatRangeField(**options)
-
-    Stores a range of floating point values. Based on a
-    :class:`~django.db.models.FloatField`. Represented by a ``numrange`` in the
-    database and a :class:`~psycopg2:psycopg2.extras.NumericRange` in Python.
-
-    .. deprecated:: 2.2
-
-        Use :class:`DecimalRangeField` instead.
 
 ``DateTimeRangeField``
 ----------------------

@@ -125,7 +125,7 @@ class IntegerFieldTests(TestCase):
                         ranged_value_field.run_validators(max_backend_value + 1)
 
     def test_types(self):
-        instance = self.model(value=0)
+        instance = self.model(value=1)
         self.assertIsInstance(instance.value, int)
         instance.save()
         self.assertIsInstance(instance.value, int)
@@ -184,6 +184,9 @@ class PositiveIntegerFieldTests(IntegerFieldTests):
 
 class ValidationTests(SimpleTestCase):
 
+    class Choices(models.IntegerChoices):
+        A = 1
+
     def test_integerfield_cleans_valid_string(self):
         f = models.IntegerField()
         self.assertEqual(f.clean('2', None), 2)
@@ -217,3 +220,14 @@ class ValidationTests(SimpleTestCase):
         f = models.IntegerField(choices=((1, 1),))
         with self.assertRaises(ValidationError):
             f.clean('0', None)
+
+    def test_enum_choices_cleans_valid_string(self):
+        f = models.IntegerField(choices=self.Choices.choices)
+        self.assertEqual(f.clean('1', None), 1)
+
+    def test_enum_choices_invalid_input(self):
+        f = models.IntegerField(choices=self.Choices.choices)
+        with self.assertRaises(ValidationError):
+            f.clean('A', None)
+        with self.assertRaises(ValidationError):
+            f.clean('3', None)
