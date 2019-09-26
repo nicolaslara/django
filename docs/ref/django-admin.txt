@@ -213,7 +213,7 @@ specified in your :setting:`USER`, :setting:`PASSWORD`, etc., settings.
 * For SQLite, this runs the ``sqlite3`` command-line client.
 * For Oracle, this runs the ``sqlplus`` command-line client.
 
-This command assumes the programs are on your ``PATH`` so that a simple call to
+This command assumes the programs are on your ``PATH`` so that a call to
 the program name (``psql``, ``mysql``, ``sqlite3``, ``sqlplus``) will find the
 program in the right place. There's no way to specify the location of the
 program manually.
@@ -400,7 +400,7 @@ By default, ``inspectdb`` creates unmanaged models. That is, ``managed = False``
 in the model's ``Meta`` class tells Django not to manage each table's creation,
 modification, and deletion. If you do want to allow Django to manage the
 table's lifecycle, you'll need to change the
-:attr:`~django.db.models.Options.managed` option to ``True`` (or simply remove
+:attr:`~django.db.models.Options.managed` option to ``True`` (or remove
 it because ``True`` is its default value).
 
 Database-specific notes
@@ -421,17 +421,11 @@ PostgreSQL
 * Models are created for partition tables if
   :option:`--include-partitions` is used.
 
-.. versionchanged:: 2.2
-
-    Support for foreign tables and materialized views was added.
-
 .. django-admin-option:: --database DATABASE
 
 Specifies the database to introspect. Defaults to ``default``.
 
 .. django-admin-option:: --include-partitions
-
-.. versionadded:: 2.2
 
 If this option is provided, models are also created for partitions.
 
@@ -537,7 +531,7 @@ raise an exception::
 
     post_save.connect(my_handler, sender=MyModel)
 
-You could also write a simple decorator to encapsulate this logic::
+You could also write a decorator to encapsulate this logic::
 
     from functools import wraps
 
@@ -783,8 +777,6 @@ name must be a valid Python :ref:`identifier <python:identifiers>`.
 
 .. django-admin-option:: --no-header
 
-.. versionadded:: 2.2
-
 Generate migration files without Django version and timestamp header.
 
 .. django-admin-option:: --check
@@ -840,8 +832,6 @@ table names and so is only safe to use if you are confident that your existing
 schema matches what is recorded in your initial migration.
 
 .. django-admin-option:: --plan
-
-.. versionadded:: 2.2
 
 Shows the migration operations that will be performed for the given ``migrate``
 command.
@@ -907,17 +897,13 @@ more robust change detection, and a reduction in power usage. Django supports
 .. _pywatchman: https://pypi.org/project/pywatchman/
 .. _watchman documentation: https://facebook.github.io/watchman/docs/config.html#ignore_dirs
 
-.. versionchanged:: 2.2
-
-   Watchman support replaced support for `pyinotify`.
-
 When you start the server, and each time you change Python code while the
 server is running, the system check framework will check your entire Django
 project for some common errors (see the :djadmin:`check` command). If any
 errors are found, they will be printed to standard output.
 
 You can run as many concurrent servers as you want, as long as they're on
-separate ports. Just execute ``django-admin runserver`` more than once.
+separate ports by executing ``django-admin runserver`` more than once.
 
 Note that the default IP address, ``127.0.0.1``, is not accessible from other
 machines on your network. To make your development server viewable to other
@@ -1192,8 +1178,6 @@ Sets the name of the squashed migration. When omitted, the name is based on the
 first and last migration, with ``_squashed_`` in between.
 
 .. django-admin-option:: --no-header
-
-.. versionadded:: 2.2
 
 Generate squashed migration file without Django version and timestamp header.
 
@@ -1729,7 +1713,7 @@ Example usage::
 .. django-admin-option:: --traceback
 
 Displays a full stack trace when a :exc:`~django.core.management.CommandError`
-is raised. By default, ``django-admin`` will show a simple error message when a
+is raised. By default, ``django-admin`` will show an error message when a
 ``CommandError`` occurs and a full stack trace for any other exception.
 
 Example usage::
@@ -1761,8 +1745,6 @@ Example usage::
     django-admin runserver --no-color
 
 .. django-admin-option:: --force-color
-
-.. versionadded:: 2.2
 
 Forces colorization of the command output if it would otherwise be disabled
 as discussed in :ref:`syntax-coloring`. For example, you may want to pipe

@@ -2,11 +2,10 @@ import warnings
 from datetime import datetime
 
 from django.core.paginator import (
-    EmptyPage, InvalidPage, PageNotAnInteger, Paginator, QuerySetPaginator,
+    EmptyPage, InvalidPage, PageNotAnInteger, Paginator,
     UnorderedObjectListWarning,
 )
 from django.test import SimpleTestCase, TestCase
-from django.utils.deprecation import RemovedInDjango31Warning
 
 from .custom import ValidAdjacentNumsPaginator
 from .models import Article
@@ -157,7 +156,7 @@ class PaginationTests(SimpleTestCase):
                 raise AttributeError('abc')
 
         with self.assertRaisesMessage(AttributeError, 'abc'):
-            Paginator(AttributeErrorContainer(), 10).count()
+            Paginator(AttributeErrorContainer(), 10).count
 
     def test_count_does_not_silence_type_error(self):
         class TypeErrorContainer:
@@ -165,7 +164,7 @@ class PaginationTests(SimpleTestCase):
                 raise TypeError('abc')
 
         with self.assertRaisesMessage(TypeError, 'abc'):
-            Paginator(TypeErrorContainer(), 10).count()
+            Paginator(TypeErrorContainer(), 10).count
 
     def check_indexes(self, params, page_num, indexes):
         """
@@ -297,12 +296,6 @@ class PaginationTests(SimpleTestCase):
         paginator = Paginator([], 2, allow_empty_first_page=False)
         with self.assertRaises(EmptyPage):
             paginator.get_page(1)
-
-    def test_querysetpaginator_deprecation(self):
-        msg = 'The QuerySetPaginator alias of Paginator is deprecated.'
-        with self.assertWarnsMessage(RemovedInDjango31Warning, msg) as cm:
-            QuerySetPaginator([], 1)
-        self.assertEqual(cm.filename, __file__)
 
 
 class ModelPaginationTests(TestCase):

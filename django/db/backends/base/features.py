@@ -288,6 +288,9 @@ class BaseDatabaseFeatures:
     # field(s)?
     allows_multiple_constraints_on_same_fields = True
 
+    # Does the backend support boolean expressions in the SELECT clause?
+    supports_boolean_expr_in_select_clause = True
+
     def __init__(self, connection):
         self.connection = connection
 
@@ -309,3 +312,8 @@ class BaseDatabaseFeatures:
             count, = cursor.fetchone()
             cursor.execute('DROP TABLE ROLLBACK_TEST')
         return count == 0
+
+    def allows_group_by_selected_pks_on_model(self, model):
+        if not self.allows_group_by_selected_pks:
+            return False
+        return model._meta.managed

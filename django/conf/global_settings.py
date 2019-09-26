@@ -171,9 +171,6 @@ MANAGERS = ADMINS
 # manually specified. It's used to construct the Content-Type header.
 DEFAULT_CHARSET = 'utf-8'
 
-# Encoding of files read from disk (template and initial SQL files).
-FILE_CHARSET = 'utf-8'
-
 # Email address that error messages come from.
 SERVER_EMAIL = 'root@localhost'
 
@@ -415,7 +412,7 @@ DEFAULT_TABLESPACE = ''
 DEFAULT_INDEX_TABLESPACE = ''
 
 # Default X-Frame-Options header value
-X_FRAME_OPTIONS = 'SAMEORIGIN'
+X_FRAME_OPTIONS = 'DENY'
 
 USE_X_FORWARDED_HOST = False
 USE_X_FORWARDED_PORT = False
@@ -508,6 +505,10 @@ LOGOUT_REDIRECT_URL = None
 
 # The number of days a password reset link is valid for
 PASSWORD_RESET_TIMEOUT_DAYS = 3
+
+# The minimum number of seconds a password reset link is valid for
+# (default: 3 days).
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 3
 
 # the first hasher in this list is the preferred algorithm.  any
 # password using different algorithms will be converted automatically
@@ -628,10 +629,11 @@ SILENCED_SYSTEM_CHECKS = []
 # SECURITY MIDDLEWARE #
 #######################
 SECURE_BROWSER_XSS_FILTER = False
-SECURE_CONTENT_TYPE_NOSNIFF = False
+SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
 SECURE_HSTS_SECONDS = 0
 SECURE_REDIRECT_EXEMPT = []
+SECURE_REFERRER_POLICY = None
 SECURE_SSL_HOST = None
 SECURE_SSL_REDIRECT = False
