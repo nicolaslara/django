@@ -5,7 +5,7 @@ import re
 import time
 
 from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache, BaseAioCache
-from django.utils.asyncio import auto_async, async_unsafe
+from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 
 
@@ -27,6 +27,7 @@ class BaseMemcachedCache(BaseCache):
         self._options = params.get('OPTIONS') or {}
 
     @property
+    @async_unsafe
     def _cache(self):
         """
         Implement transparent thread-safe access to a memcached client.
@@ -63,40 +64,33 @@ class BaseMemcachedCache(BaseCache):
             timeout += int(time.time())
         return int(timeout)
 
-    @async_unsafe
     def add(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
         key = self.make_key(key, version=version)
         return self._cache.add(key, value, self.get_backend_timeout(timeout))
 
-    @auto_async
     def get(self, key, default=None, version=None):
         key = self.make_key(key, version=version)
         return self._cache.get(key, default)
 
-    @auto_async
     def set(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
         key = self.make_key(key, version=version)
         if not self._cache.set(key, value, self.get_backend_timeout(timeout)):
             # make sure the key doesn't keep its old value in case of failure to set (memcached's 1MB limit)
             self._cache.delete(key)
 
-    @async_unsafe
     def delete(self, key, version=None):
         key = self.make_key(key, version=version)
         self._cache.delete(key)
 
-    @async_unsafe
     def get_many(self, keys, version=None):
         key_map = {self.make_key(key, version=version): key for key in keys}
         ret = self._cache.get_multi(key_map.keys())
         return {key_map[k]: v for k, v in ret.items()}
 
-    @async_unsafe
     def close(self, **kwargs):
         # Many clients don't clean up connections properly.
         self._cache.disconnect_all()
 
-    @async_unsafe
     def incr(self, key, delta=1, version=None):
         key = self.make_key(key, version=version)
         # memcached doesn't support a negative delta
@@ -115,7 +109,6 @@ class BaseMemcachedCache(BaseCache):
             raise ValueError("Key '%s' not found" % key)
         return val
 
-    @async_unsafe
     def decr(self, key, delta=1, version=None):
         key = self.make_key(key, version=version)
         # memcached doesn't support a negative delta
@@ -134,7 +127,6 @@ class BaseMemcachedCache(BaseCache):
             raise ValueError("Key '%s' not found" % key)
         return val
 
-    @async_unsafe
     def set_many(self, data, timeout=DEFAULT_TIMEOUT, version=None):
         safe_data = {}
         original_keys = {}
@@ -145,11 +137,9 @@ class BaseMemcachedCache(BaseCache):
         failed_keys = self._cache.set_multi(safe_data, self.get_backend_timeout(timeout))
         return [original_keys[k] for k in failed_keys]
 
-    @async_unsafe
     def delete_many(self, keys, version=None):
         self._cache.delete_multi(self.make_key(key, version=version) for key in keys)
 
-    @async_unsafe
     def clear(self):
         self._cache.flush_all()
 
@@ -161,6 +151,7 @@ class MemcachedCache(BaseMemcachedCache):
         super().__init__(server, params, library=memcache, value_not_found_exception=ValueError)
 
     @property
+    @async_unsafe
     def _cache(self):
         if getattr(self, '_client', None) is None:
             client_kwargs = {'pickleProtocol': pickle.HIGHEST_PROTOCOL}
@@ -168,12 +159,10 @@ class MemcachedCache(BaseMemcachedCache):
             self._client = self._lib.Client(self._servers, **client_kwargs)
         return self._client
 
-    @async_unsafe
     def touch(self, key, timeout=DEFAULT_TIMEOUT, version=None):
         key = self.make_key(key, version=version)
         return self._cache.touch(key, self.get_backend_timeout(timeout)) != 0
 
-    @auto_async
     def get(self, key, default=None, version=None):
         key = self.make_key(key, version=version)
         val = self._cache.get(key)
@@ -192,6 +181,7 @@ class PyLibMCCache(BaseMemcachedCache):
         super().__init__(server, params, library=pylibmc, value_not_found_exception=pylibmc.NotFound)
 
     @cached_property
+    @async_unsafe
     def _cache(self):
         return self._lib.Client(self._servers, **self._options)
 

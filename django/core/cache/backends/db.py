@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
 from django.db import DatabaseError, connections, models, router, transaction
 from django.utils import timezone
+from django.utils.asyncio import async_unsafe
 
 
 class Options:
@@ -50,6 +51,7 @@ class DatabaseCache(BaseDatabaseCache):
     def get(self, key, default=None, version=None):
         return self.get_many([key], version).get(key, default)
 
+    @async_unsafe
     def get_many(self, keys, version=None):
         if not keys:
             return {}
@@ -109,6 +111,7 @@ class DatabaseCache(BaseDatabaseCache):
         self.validate_key(key)
         return self._base_set('touch', key, None, timeout)
 
+    @async_unsafe
     def _base_set(self, mode, key, value, timeout=DEFAULT_TIMEOUT):
         timeout = self.get_backend_timeout(timeout)
         db = router.db_for_write(self.cache_model_class)
@@ -206,6 +209,7 @@ class DatabaseCache(BaseDatabaseCache):
             key_list.append(self.make_key(key, version))
         self._base_delete_many(key_list)
 
+    @async_unsafe
     def _base_delete_many(self, keys):
         if not keys:
             return
@@ -225,6 +229,7 @@ class DatabaseCache(BaseDatabaseCache):
                 keys,
             )
 
+    @async_unsafe
     def has_key(self, key, version=None):
         key = self.make_key(key, version=version)
         self.validate_key(key)
@@ -250,6 +255,7 @@ class DatabaseCache(BaseDatabaseCache):
             )
             return cursor.fetchone() is not None
 
+    @async_unsafe
     def _cull(self, db, cursor, now):
         if self._cull_frequency == 0:
             self.clear()
@@ -269,6 +275,7 @@ class DatabaseCache(BaseDatabaseCache):
                                "WHERE cache_key < %%s" % table,
                                [cursor.fetchone()[0]])
 
+    @async_unsafe
     def clear(self):
         db = router.db_for_write(self.cache_model_class)
         connection = connections[db]

@@ -3,6 +3,7 @@ import time
 import warnings
 
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.asyncio import SyncHelper, AsyncHelper
 from django.utils.module_loading import import_string
 
 
@@ -73,6 +74,10 @@ class BaseCache:
         self.key_prefix = params.get('KEY_PREFIX', '')
         self.version = params.get('VERSION', 1)
         self.key_func = get_key_func(params.get('KEY_FUNCTION'))
+
+        # Setup helpers to explicitly access this from a sync and async context
+        self.a = AsyncHelper(parent=self)
+        self.s = SyncHelper(parent=self)
 
     def get_backend_timeout(self, timeout=DEFAULT_TIMEOUT):
         """

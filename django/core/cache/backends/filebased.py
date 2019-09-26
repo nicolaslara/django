@@ -11,6 +11,7 @@ import zlib
 from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
 from django.core.files import locks
 from django.core.files.move import file_move_safe
+from django.utils.asyncio import async_unsafe
 
 
 class FileBasedCache(BaseCache):
@@ -28,6 +29,7 @@ class FileBasedCache(BaseCache):
         self.set(key, value, timeout, version)
         return True
 
+    @async_unsafe
     def get(self, key, default=None, version=None):
         fname = self._key_to_file(key, version)
         try:
@@ -38,11 +40,13 @@ class FileBasedCache(BaseCache):
             pass
         return default
 
+    @async_unsafe
     def _write_content(self, file, timeout, value):
         expiry = self.get_backend_timeout(timeout)
         file.write(pickle.dumps(expiry, self.pickle_protocol))
         file.write(zlib.compress(pickle.dumps(value, self.pickle_protocol)))
 
+    @async_unsafe
     def set(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
         self._createdir()  # Cache dir can be deleted at any time.
         fname = self._key_to_file(key, version)
@@ -58,6 +62,7 @@ class FileBasedCache(BaseCache):
             if not renamed:
                 os.remove(tmp_path)
 
+    @async_unsafe
     def touch(self, key, timeout=DEFAULT_TIMEOUT, version=None):
         try:
             with open(self._key_to_file(key, version), 'r+b') as f:
@@ -87,6 +92,7 @@ class FileBasedCache(BaseCache):
             # The file may have been removed by another process.
             pass
 
+    @async_unsafe
     def has_key(self, key, version=None):
         fname = self._key_to_file(key, version)
         if os.path.exists(fname):
