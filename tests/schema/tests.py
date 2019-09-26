@@ -304,6 +304,24 @@ class SchemaTests(TransactionTestCase):
             editor.alter_field(AuthorTextFieldWithIndex, old_field, new_field, strict=True)
         self.assertForeignKeyExists(AuthorTextFieldWithIndex, 'text_field_id', 'schema_author')
 
+    @isolate_apps('schema')
+    def test_char_field_pk_to_auto_field(self):
+        class Foo(Model):
+            id = CharField(max_length=255, primary_key=True)
+
+            class Meta:
+                app_label = 'schema'
+
+        with connection.schema_editor() as editor:
+            editor.create_model(Foo)
+        self.isolated_local_models = [Foo]
+        old_field = Foo._meta.get_field('id')
+        new_field = AutoField(primary_key=True)
+        new_field.set_attributes_from_name('id')
+        new_field.model = Foo
+        with connection.schema_editor() as editor:
+            editor.alter_field(Foo, old_field, new_field, strict=True)
+
     @skipUnlessDBFeature('supports_foreign_keys')
     def test_fk_to_proxy(self):
         "Creating a FK to a proxy model creates database constraints."
@@ -857,6 +875,26 @@ class SchemaTests(TransactionTestCase):
             with self.assertRaisesMessage(DataError, msg):
                 editor.alter_field(Author, old_field, new_field, strict=True)
 
+    @unittest.skipUnless(connection.vendor == 'postgresql', 'PostgreSQL specific')
+    def test_alter_field_with_custom_db_type(self):
+        from django.contrib.postgres.fields import ArrayField
+
+        class Foo(Model):
+            field = ArrayField(CharField(max_length=255))
+
+            class Meta:
+                app_label = 'schema'
+
+        with connection.schema_editor() as editor:
+            editor.create_model(Foo)
+        self.isolated_local_models = [Foo]
+        old_field = Foo._meta.get_field('field')
+        new_field = ArrayField(CharField(max_length=16))
+        new_field.set_attributes_from_name('field')
+        new_field.model = Foo
+        with connection.schema_editor() as editor:
+            editor.alter_field(Foo, old_field, new_field, strict=True)
+
     def test_alter_textfield_to_null(self):
         """
         #24307 - Should skip an alter statement on databases with
@@ -1130,6 +1168,7 @@ class SchemaTests(TransactionTestCase):
         # The unique constraint remains.
         self.assertEqual(counts, {'fks': expected_fks, 'uniques': 1, 'indexes': 0})
 
+    @skipUnlessDBFeature('ignores_table_name_case')
     def test_alter_db_table_case(self):
         # Create the table
         with connection.schema_editor() as editor:
@@ -2574,7 +2613,7 @@ class SchemaTests(TransactionTestCase):
                 self.assertIsNone(field.default)
 
     @unittest.skipIf(connection.vendor == 'sqlite', 'SQLite naively remakes the table on field alteration.')
-    def test_alter_field_default_doesnt_perfom_queries(self):
+    def test_alter_field_default_doesnt_perform_queries(self):
         """
         No queries are performed if a field default changes and the field's
         not changing from null to non-null.

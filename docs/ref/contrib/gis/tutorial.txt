@@ -302,7 +302,7 @@ besides the tools included within GeoDjango, you may also use the following:
 * `shp2pgsql`_: This utility included with PostGIS imports ESRI shapefiles into
   PostGIS.
 
-.. _ogr2ogr: https://www.gdal.org/ogr2ogr.html
+.. _ogr2ogr: https://gdal.org/programs/ogr2ogr.html
 .. _shp2pgsql: https://postgis.net/docs/using_postgis_dbmanagement.html#shp2pgsql_usage
 
 .. _gdalinterface:
@@ -758,8 +758,8 @@ available with the :class:`~django.contrib.gis.admin.GeoModelAdmin`
 The PROJ.4 datum shifting files must be installed (see the :ref:`PROJ.4
 installation instructions <proj4>` for more details).
 
-If you meet this requirement, then just substitute the ``OSMGeoAdmin``
-option class in your ``admin.py`` file::
+If you meet this requirement, then substitute the ``OSMGeoAdmin`` option class
+in your ``admin.py`` file::
 
     admin.site.register(WorldBorder, admin.OSMGeoAdmin)
 

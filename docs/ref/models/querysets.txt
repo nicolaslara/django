@@ -151,8 +151,8 @@ Here's the formal declaration of a ``QuerySet``:
         The ``query`` parameter to :class:`QuerySet` exists so that specialized
         query subclasses can reconstruct internal query state. The value of the
         parameter is an opaque representation of that query state and is not
-        part of a public API. To put it simply: if you need to ask, you don't
-        need to use it.
+        part of a public API. To put it another way: if you need to ask, you
+        don't need to use it.
 
 .. currentmodule:: django.db.models.query.QuerySet
 
@@ -1943,7 +1943,7 @@ details. The internal implementation has some more error-checking than this and
 handles some extra edge-conditions; if you're interested, read the code.
 
 If you have a field named ``defaults`` and want to use it as an exact lookup in
-``get_or_create()``, just use ``'defaults__exact'``, like so::
+``get_or_create()``, use ``'defaults__exact'``, like so::
 
     Foo.objects.get_or_create(defaults__exact='bar', defaults={'defaults': 'baz'})
 
@@ -2091,14 +2091,8 @@ that fail constraints such as duplicate unique values. Enabling this parameter
 disables setting the primary key on each model instance (if the database
 normally supports it).
 
-.. versionchanged:: 2.2
-
-    The ``ignore_conflicts`` parameter was added.
-
 ``bulk_update()``
 ~~~~~~~~~~~~~~~~~
-
-.. versionadded:: 2.2
 
 .. method:: bulk_update(objs, fields, batch_size=None)
 
@@ -2252,10 +2246,6 @@ psycopg mailing list <https://www.postgresql.org/message-id/4D2F2C71.8080805%40d
     is going to fetch less than 100KB of data, which seems a good compromise
     between the number of rows transferred and the data discarded if the loop
     is exited early.
-
-.. versionchanged:: 2.2
-
-    Support for result streaming on SQLite was added.
 
 ``latest()``
 ~~~~~~~~~~~~
@@ -2418,8 +2408,8 @@ gains).
 Additionally, if a ``some_queryset`` has not yet been evaluated, but you know
 that it will be at some point, then using ``some_queryset.exists()`` will do
 more overall work (one query for the existence check plus an extra one to later
-retrieve the results) than simply using ``bool(some_queryset)``, which
-retrieves the results and then checks if any were returned.
+retrieve the results) than using ``bool(some_queryset)``, which retrieves the
+results and then checks if any were returned.
 
 ``update()``
 ~~~~~~~~~~~~
@@ -2969,7 +2959,8 @@ Example::
 implementation of the relevant query varies among different database engines.)
 
 When :setting:`USE_TZ` is ``True``, fields are converted to the current time
-zone before filtering.
+zone before filtering. This requires :ref:`time zone definitions in the
+database <database-time-zone-definitions>`.
 
 .. fieldlookup:: year
 
@@ -2994,14 +2985,13 @@ SQL equivalent:
 (The exact SQL syntax varies for each database engine.)
 
 When :setting:`USE_TZ` is ``True``, datetime fields are converted to the
-current time zone before filtering.
+current time zone before filtering. This requires :ref:`time zone definitions
+in the database <database-time-zone-definitions>`.
 
 .. fieldlookup:: iso_year
 
 ``iso_year``
 ~~~~~~~~~~~~
-
-.. versionadded:: 2.2
 
 For date and datetime fields, an exact ISO 8601 week-numbering year match.
 Allows chaining additional field lookups. Takes an integer year.
@@ -3014,7 +3004,8 @@ Example::
 (The exact SQL syntax varies for each database engine.)
 
 When :setting:`USE_TZ` is ``True``, datetime fields are converted to the
-current time zone before filtering.
+current time zone before filtering. This requires :ref:`time zone definitions
+in the database <database-time-zone-definitions>`.
 
 .. fieldlookup:: month
 
@@ -3088,8 +3079,9 @@ Example::
 (No equivalent SQL code fragment is included for this lookup because
 implementation of the relevant query varies among different database engines.)
 
-When :setting:`USE_TZ` is ``True``, fields are converted to the current time
-zone before filtering.
+When :setting:`USE_TZ` is ``True``, datetime fields are converted to the
+current time zone before filtering. This requires :ref:`time zone definitions
+in the database <database-time-zone-definitions>`.
 
 .. fieldlookup:: week_day
 
@@ -3155,7 +3147,8 @@ Example::
 implementation of the relevant query varies among different database engines.)
 
 When :setting:`USE_TZ` is ``True``, fields are converted to the current time
-zone before filtering.
+zone before filtering. This requires :ref:`time zone definitions in the
+database <database-time-zone-definitions>`.
 
 .. fieldlookup:: hour
 
@@ -3181,8 +3174,9 @@ SQL equivalent:
 
 (The exact SQL syntax varies for each database engine.)
 
-For datetime fields, when :setting:`USE_TZ` is ``True``, values are converted
-to the current time zone before filtering.
+When :setting:`USE_TZ` is ``True``, datetime fields are converted to the
+current time zone before filtering. This requires :ref:`time zone definitions
+in the database <database-time-zone-definitions>`.
 
 .. fieldlookup:: minute
 
@@ -3208,8 +3202,9 @@ SQL equivalent:
 
 (The exact SQL syntax varies for each database engine.)
 
-For datetime fields, When :setting:`USE_TZ` is ``True``, values are converted
-to the current time zone before filtering.
+When :setting:`USE_TZ` is ``True``, datetime fields are converted to the
+current time zone before filtering. This requires :ref:`time zone definitions
+in the database <database-time-zone-definitions>`.
 
 .. fieldlookup:: second
 
@@ -3235,8 +3230,9 @@ SQL equivalent:
 
 (The exact SQL syntax varies for each database engine.)
 
-For datetime fields, when :setting:`USE_TZ` is ``True``, values are converted
-to the current time zone before filtering.
+When :setting:`USE_TZ` is ``True``, datetime fields are converted to the
+current time zone before filtering. This requires :ref:`time zone definitions
+in the database <database-time-zone-definitions>`.
 
 .. fieldlookup:: isnull
 
@@ -3456,10 +3452,6 @@ by the aggregate.
         By default, ``StdDev`` returns the population standard deviation. However,
         if ``sample=True``, the return value will be the sample standard deviation.
 
-    .. versionchanged:: 2.2
-
-        SQLite support was added.
-
 ``Sum``
 ~~~~~~~
 
@@ -3499,10 +3491,6 @@ by the aggregate.
 
         By default, ``Variance`` returns the population variance. However,
         if ``sample=True``, the return value will be the sample variance.
-
-    .. versionchanged:: 2.2
-
-        SQLite support was added.
 
 Query-related tools
 ===================

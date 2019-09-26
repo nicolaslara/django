@@ -6,6 +6,7 @@ themselves do not have to (and could be backed by things other than SQL
 databases). The abstraction barrier only works one way: this module has to know
 all about the internals of models in order to get the information it needs.
 """
+import copy
 import difflib
 import functools
 import inspect
@@ -324,6 +325,10 @@ class Query(BaseExpression):
             obj._extra_select_cache = None
         else:
             obj._extra_select_cache = self._extra_select_cache.copy()
+        if self.select_related is not False:
+            # Use deepcopy because select_related stores fields in nested
+            # dicts.
+            obj.select_related = copy.deepcopy(obj.select_related)
         if 'subq_aliases' in self.__dict__:
             obj.subq_aliases = self.subq_aliases.copy()
         obj.used_aliases = self.used_aliases.copy()
@@ -1054,15 +1059,21 @@ class Query(BaseExpression):
         elif isinstance(value, (list, tuple)):
             # The items of the iterable may be expressions and therefore need
             # to be resolved independently.
+            resolved_values = []
             for sub_value in value:
                 if hasattr(sub_value, 'resolve_expression'):
                     if isinstance(sub_value, F):
-                        sub_value.resolve_expression(
+                        resolved_values.append(sub_value.resolve_expression(
                             self, reuse=can_reuse, allow_joins=allow_joins,
                             simple_col=simple_col,
-                        )
+                        ))
                     else:
-                        sub_value.resolve_expression(self, reuse=can_reuse, allow_joins=allow_joins)
+                        resolved_values.append(sub_value.resolve_expression(
+                            self, reuse=can_reuse, allow_joins=allow_joins,
+                        ))
+                else:
+                    resolved_values.append(sub_value)
+            value = tuple(resolved_values)
         return value
 
     def solve_lookup_type(self, lookup):
@@ -1223,6 +1234,16 @@ class Query(BaseExpression):
         """
         if isinstance(filter_expr, dict):
             raise FieldError("Cannot parse keyword query as dict")
+        if hasattr(filter_expr, 'resolve_expression') and getattr(filter_expr, 'conditional', False):
+            if connections[DEFAULT_DB_ALIAS].ops.conditional_expression_supported_in_where_clause(filter_expr):
+                condition = filter_expr.resolve_expression(self)
+            else:
+                # Expression is not supported in the WHERE clause, add
+                # comparison with True.
+                condition = self.build_lookup(['exact'], filter_expr.resolve_expression(self), True)
+            clause = self.where_class()
+            clause.add(condition, AND)
+            return clause, []
         arg, value = filter_expr
         if not arg:
             raise FieldError("Cannot parse keyword query %r" % arg)
@@ -1686,7 +1707,9 @@ class Query(BaseExpression):
         handle.
         """
         filter_lhs, filter_rhs = filter_expr
-        if isinstance(filter_rhs, F):
+        if isinstance(filter_rhs, OuterRef):
+            filter_expr = (filter_lhs, OuterRef(filter_rhs))
+        elif isinstance(filter_rhs, F):
             filter_expr = (filter_lhs, OuterRef(filter_rhs.name))
         # Generate the inner query.
         query = Query(self.model)
