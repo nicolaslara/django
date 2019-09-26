@@ -51,6 +51,7 @@ class AutoAsync(object):
         else:
             self.as_async = sync_to_async(f)
             self.as_sync = f
+        self.sync = async_unsafe(self.as_sync)
 
     def __call__(self, *args, **kwargs):
         # Initial experiment with frame hacks.
