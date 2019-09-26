@@ -216,3 +216,9 @@ class AioMemcachedCache(BaseAioCacheMixin, BaseMemcachedCache):
     @property
     def library(self):
         return self._lib
+
+    def close(self, **kwargs):
+        # Don't disconnect, as this should be handled by the
+        # library. The disconnects should probably be abstracted
+        # from the base class
+        pass
