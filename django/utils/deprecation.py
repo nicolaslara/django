@@ -1,3 +1,6 @@
+from asgiref.sync import sync_to_async
+from asyncio import iscoroutinefunction
+from django.utils.decorators import async_middleware
 import inspect
 import warnings
 
@@ -79,16 +82,28 @@ class DeprecationInstanceCheck(type):
         return super().__instancecheck__(instance)
 
 
+@async_middleware
 class MiddlewareMixin:
     def __init__(self, get_response=None):
+        print(f'FIXME: MiddlewareMixin.__init__({type(self).__name__}): get_response={get_response!r}')
         self.get_response = get_response
+        if hasattr(self, 'process_request'):  # FIXME: iscoroutinefunction...
+            self.process_request = sync_to_async(self.process_request)
+        if hasattr(self, 'get_response') and not iscoroutinefunction(self.get_response):
+            print('FIXME: wrapping get_response')
+            self.get_response = sync_to_async(self.get_response)
+        if hasattr(self, 'process_response'):  # FIXME: iscoroutinefunction...
+            self.process_response = sync_to_async(self.process_response)
         super().__init__()
 
-    def __call__(self, request):
+    async def __call__(self, request):
         response = None
         if hasattr(self, 'process_request'):
-            response = self.process_request(request)
-        response = response or self.get_response(request)
+            response = await self.process_request(request)
+        print(f'FIXME: MiddlewareMixin after process_request: response={response!r}')
+        import pdb; pdb.set_trace()  # FIXME
+        response = response or await self.get_response(request)
+        print(f'FIXME: MiddlewareMixin after get_response: response={response!r}')
         if hasattr(self, 'process_response'):
-            response = self.process_response(request, response)
+            response = await self.process_response(request, response)
         return response

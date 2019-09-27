@@ -31,6 +31,7 @@ def convert_exception_to_response(get_response):
     no middleware leaks an exception and that the next middleware in the stack
     can rely on getting a response instead of an exception.
     """
+    #import pdb; pdb.set_trace()  # FIXME
     if asyncio.iscoroutinefunction(get_response):
         @wraps(get_response)
         async def inner(request):
