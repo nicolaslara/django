@@ -11,7 +11,12 @@ import zlib
 from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
 from django.core.files import locks
 from django.core.files.move import file_move_safe
-from django.utils.asyncio import async_unsafe
+from django.utils.asyncio import async_unsafe, AsyncHelper
+
+
+class FileBasedAsyncHelper(AsyncHelper):
+    async def get(self, key, default=None, version=None):
+        pass  # here we implement the natively async version
 
 
 class FileBasedCache(BaseCache):
@@ -22,6 +27,8 @@ class FileBasedCache(BaseCache):
         super().__init__(params)
         self._dir = os.path.abspath(dir)
         self._createdir()
+        # Setup helpers to explicitly access this from a sync and async context
+        self.a = FileBasedAsyncHelper(parent=self)
 
     def add(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
         if self.has_key(key, version):
