@@ -8,6 +8,7 @@ import asyncio
 import threading
 import warnings
 
+import aiopg
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
@@ -25,35 +26,40 @@ from django.utils.version import get_version_tuple
 try:
     import aiopg as Database
 except ImportError as e:
-    raise ImproperlyConfigured("Error loading psycopg2 module: %s" % e)
+    raise ImproperlyConfigured("Error loading aiopg module: %s" % e)
 
 # Some of these import psycopg2, so import them after checking if it's installed.
-# from .client import DatabaseClient                          # NOQA isort:skip
-# from .creation import DatabaseCreation                      # NOQA isort:skip
-# from .features import DatabaseFeatures                      # NOQA isort:skip
-# from .introspection import DatabaseIntrospection            # NOQA isort:skip
-# from .operations import DatabaseOperations                  # NOQA isort:skip
-# from .schema import DatabaseSchemaEditor                    # NOQA isort:skip
-# from .utils import utc_tzinfo_factory                       # NOQA isort:skip
+from .client import DatabaseClient                          # NOQA isort:skip
+
+# ToDo: A lot of these things use cursors, etc... so they may need to be
+#  rewriten
+
+from ..postgresql.creation import DatabaseCreation            # NOQA isort:skip
+from ..postgresql.features import DatabaseFeatures            # NOQA isort:skip
+from ..postgresql.introspection import DatabaseIntrospection  # NOQA isort:skip
+from ..postgresql.operations import DatabaseOperations        # NOQA isort:skip
+from ..postgresql.schema import DatabaseSchemaEditor          # NOQA isort:skip
+from ..postgresql.utils import utc_tzinfo_factory             # NOQA isort:skip
 
 
 class DatabaseWrapper(psql_backend.DatabaseWrapper):
     Database = Database
-    # SchemaEditorClass = DatabaseSchemaEditor
-    # # Classes instantiated in __init__().
-    # client_class = DatabaseClient
-    # creation_class = DatabaseCreation
-    # features_class = DatabaseFeatures
-    # introspection_class = DatabaseIntrospection
-    # ops_class = DatabaseOperations
+    SchemaEditorClass = DatabaseSchemaEditor
+    # Classes instantiated in __init__().
+    client_class = DatabaseClient
+    creation_class = DatabaseCreation
+    features_class = DatabaseFeatures
+    introspection_class = DatabaseIntrospection
+    ops_class = DatabaseOperations
 
-    @async_unsafe
-    def get_new_connection(self, conn_params):
+    async def get_new_connection(self, conn_params):
 
         # TODO: REWRITE THIS
+        print(conn_params)
 
-        connection = Database.connect(**conn_params)
+        connection = await aiopg.connect(**conn_params)
 
+        return connection
         # self.isolation_level must be set:
         # - after connecting to the database in order to obtain the database's
         #   default when no value is explicitly specified in options.
@@ -66,36 +72,44 @@ class DatabaseWrapper(psql_backend.DatabaseWrapper):
             self.isolation_level = connection.isolation_level
         else:
             # Set the isolation level to the value from OPTIONS.
-            if self.isolation_level != connection.isolation_level:
-                connection.set_session(isolation_level=self.isolation_level)
+            pass
+            # FIXME: This is currently not working.set_session() only works form a sync context
+            #if self.isolation_level != connection.isolation_level:
+            #    await connection.set_session(isolation_level=self.isolation_level)
 
         return connection
 
-    def ensure_timezone(self):
+    async def ensure_timezone(self):
 
         # TODO: REVIEW THIS FOR ASYNC COMPATIBILITY
 
         if self.connection is None:
             return False
-        conn_timezone_name = self.connection.get_parameter_status('TimeZone')
+        conn_timezone_name = await self.connection.get_parameter_status('TimeZone')
         timezone_name = self.timezone_name
         if timezone_name and conn_timezone_name != timezone_name:
-            with self.connection.cursor() as cursor:
-                cursor.execute(self.ops.set_time_zone_sql(), [timezone_name])
+            async with self.connection.cursor() as cursor:
+                await cursor.execute(self.ops.set_time_zone_sql(), [timezone_name])
             return True
         return False
 
-    def init_connection_state(self):
+    async def init_connection_state(self):
 
         # TODO: Adapt to aiopg
 
-        self.connection.set_client_encoding('UTF8')
+        # FIXME: This cannot be used in an async context
+        #self.connection.set_client_encoding('UTF8')
 
-        timezone_changed = self.ensure_timezone()
+        timezone_changed = await self.ensure_timezone()
         if timezone_changed:
             # Commit after setting the time zone (see #17062)
-            if not self.get_autocommit():
-                self.connection.commit()
+            pass
+            # Psycopg in async mode doesn't allow commit
+            #if not self.get_autocommit():
+            #    await self.connection.commit()
+
+    def get_autocommit(self):
+        return False
 
     @async_unsafe
     def create_cursor(self, name=None):
@@ -143,9 +157,10 @@ class DatabaseWrapper(psql_backend.DatabaseWrapper):
             )
         )
 
-    def _set_autocommit(self, autocommit):
-        with self.wrap_database_errors:
-            self.connection.autocommit = autocommit
+    async def _set_autocommit(self, autocommit):
+        # ToDO: Fix wrap_database_errors for async
+        #with self.wrap_database_errors:
+        pass
 
     def check_constraints(self, table_names=None):
         """
@@ -166,6 +181,9 @@ class DatabaseWrapper(psql_backend.DatabaseWrapper):
 
     @property
     def _nodb_connection(self):
+
+        # ToDo:  What is this?
+
         nodb_connection = super()._nodb_connection
         try:
             nodb_connection.ensure_connection()
@@ -188,18 +206,16 @@ class DatabaseWrapper(psql_backend.DatabaseWrapper):
 
     @cached_property
     def pg_version(self):
+
+        # ToDo: adapt
+
         with self.temporary_connection():
             return self.connection.server_version
 
     def make_debug_cursor(self, cursor):
-        return CursorDebugWrapper(cursor, self)
+
+        # Ignore debug cursor for now
+
+        return psql_backend.CursorDebugWrapper(cursor, self)
 
 
-class CursorDebugWrapper(BaseCursorDebugWrapper):
-    def copy_expert(self, sql, file, *args):
-        with self.debug_sql(sql):
-            return self.cursor.copy_expert(sql, file, *args)
-
-    def copy_to(self, file, table, *args, **kwargs):
-        with self.debug_sql(sql='COPY %s TO STDOUT' % table):
-            return self.cursor.copy_to(file, table, *args, **kwargs)

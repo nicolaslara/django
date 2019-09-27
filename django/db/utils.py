@@ -69,6 +69,7 @@ class DatabaseErrorWrapper:
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is None:
             return
+        # FIXME:  This doesn't work with aiopg
         for dj_exc_type in (
                 DataError,
                 OperationalError,

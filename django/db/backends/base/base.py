@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import threading
 import time
@@ -19,6 +20,8 @@ from django.db.utils import DatabaseError, DatabaseErrorWrapper
 from django.utils import timezone
 from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
+
+from asgiref.sync import async_to_sync
 
 NO_DB_ALIAS = '__no_db__'
 
@@ -178,8 +181,8 @@ class BaseDatabaseWrapper:
 
     # ##### Backend-specific methods for creating connections #####
 
-    @async_unsafe
-    def connect(self):
+    async def connect(self):
+        # FIXME: This will break the sync backends. Needs to  be wrapped on async_to_sync in those
         """Connect to the database. Assume that the connection is closed."""
         # Check for invalid configurations.
         self.check_settings()
@@ -194,9 +197,15 @@ class BaseDatabaseWrapper:
         self.errors_occurred = False
         # Establish the connection
         conn_params = self.get_connection_params()
-        self.connection = self.get_new_connection(conn_params)
-        self.set_autocommit(self.settings_dict['AUTOCOMMIT'])
-        self.init_connection_state()
+        if asyncio.iscoroutinefunction(self.get_new_connection):
+            self.connection = await self.get_new_connection(conn_params)
+        else:
+            self.connection = self.get_new_connection(conn_params)
+        await self.set_autocommit(self.settings_dict['AUTOCOMMIT'])
+        if asyncio.iscoroutinefunction(self.init_connection_state):
+            await self.init_connection_state()
+        else:
+            self.init_connection_state()
         connection_created.send(sender=self.__class__, connection=self)
 
         self.run_on_commit = []
@@ -212,12 +221,11 @@ class BaseDatabaseWrapper:
                     "Connection '%s' cannot set TIME_ZONE because its engine "
                     "handles time zones conversions natively." % self.alias)
 
-    @async_unsafe
     def ensure_connection(self):
         """Guarantee that a connection to the database is established."""
         if self.connection is None:
             with self.wrap_database_errors:
-                self.connect()
+                async_to_sync(self.connect)()
 
     # ##### Backend-specific wrappers for PEP-249 connection methods #####
 
@@ -390,7 +398,8 @@ class BaseDatabaseWrapper:
         self.ensure_connection()
         return self.autocommit
 
-    def set_autocommit(self, autocommit, force_begin_transaction_with_broken_autocommit=False):
+    async def set_autocommit(self, autocommit, force_begin_transaction_with_broken_autocommit=False):
+        # FIXME: This will break the sync backends. Needs to  be wrapped on async_to_sync in those
         """
         Enable or disable autocommit.
 
@@ -413,7 +422,10 @@ class BaseDatabaseWrapper:
         if start_transaction_under_autocommit:
             self._start_transaction_under_autocommit()
         else:
-            self._set_autocommit(autocommit)
+            if asyncio.iscoroutinefunction(self._set_autocommit):
+                await self._set_autocommit(autocommit)
+            else:
+                self._set_autocommit(autocommit)
 
         self.autocommit = autocommit
 
