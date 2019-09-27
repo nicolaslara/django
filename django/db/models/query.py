@@ -25,6 +25,7 @@ from django.db.models.query_utils import FilteredRelation, InvalidQuery, Q
 from django.db.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE
 from django.db.utils import NotSupportedError
 from django.utils import timezone
+from django.utils.asyncio import AsyncHelper, SyncHelper
 from django.utils.functional import cached_property, partition
 from django.utils.version import get_version
 
@@ -198,6 +199,10 @@ class QuerySet:
         self._known_related_objects = {}  # {rel_field: {pk: rel_obj}}
         self._iterable_class = ModelIterable
         self._fields = None
+
+        # Setup helpers to explicitly access this from a sync and async context
+        self.a = AsyncHelper(parent=self)
+        self.s = SyncHelper(parent=self)
 
     def as_manager(cls):
         # Address the circular dependency between `Queryset` and `Manager`.
