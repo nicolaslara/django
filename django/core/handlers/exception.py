@@ -31,10 +31,22 @@ def convert_exception_to_response(get_response):
     no middleware leaks an exception and that the next middleware in the stack
     can rely on getting a response instead of an exception.
     """
-    #import pdb; pdb.set_trace()  # FIXME
-    if asyncio.iscoroutinefunction(get_response):
+    print('Wrapping')
+
+    # The problem here is that we are passing the middleware instance down
+    # into this function. The instance isn't a coroutine. It's __call__ method
+    # is, so we could do `asyncio.iscoroutinefunction(get_response.__call__)`.
+    # That will potentially break on function middlwares; need to test this.
+    #
+    # We need to consider the different styles of writing middlwares so we can
+    # support all of them here. Is this enough?
+    is_async = (getattr(get_response, '_is_async', False) or
+                asyncio.iscoroutinefunction(get_response))
+
+    if is_async:
         @wraps(get_response)
         async def inner(request):
+            print('using async')
             try:
                 response = await get_response(request)
             except Exception as exc:
@@ -44,6 +56,7 @@ def convert_exception_to_response(get_response):
     else:
         @wraps(get_response)
         def inner(request):
+            print('using sync')
             try:
                 response = get_response(request)
             except Exception as exc:
