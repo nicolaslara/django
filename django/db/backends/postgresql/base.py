@@ -8,6 +8,7 @@ import asyncio
 import threading
 import warnings
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
@@ -16,7 +17,7 @@ from django.db.backends.utils import (
     CursorDebugWrapper as BaseCursorDebugWrapper,
 )
 from django.db.utils import DatabaseError as WrappedDatabaseError
-from django.utils.asyncio import async_unsafe
+from django.utils.asyncio import async_unsafe, AsyncHelper
 from django.utils.functional import cached_property
 from django.utils.safestring import SafeString
 from django.utils.version import get_version_tuple
@@ -49,6 +50,8 @@ from .operations import DatabaseOperations                  # NOQA isort:skip
 from .schema import DatabaseSchemaEditor                    # NOQA isort:skip
 from .utils import utc_tzinfo_factory                       # NOQA isort:skip
 
+from .asyncio import AsyncDatabaseWrapper
+
 psycopg2.extensions.register_adapter(SafeString, psycopg2.extensions.QuotedString)
 psycopg2.extras.register_uuid()
 
@@ -61,6 +64,7 @@ INETARRAY = psycopg2.extensions.new_array_type(
     psycopg2.extensions.UNICODE,
 )
 psycopg2.extensions.register_type(INETARRAY)
+
 
 
 class DatabaseWrapper(BaseDatabaseWrapper):
@@ -147,6 +151,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     ops_class = DatabaseOperations
     # PostgreSQL backend-specific attributes.
     _named_cursor_idx = 0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.a = AsyncDatabaseWrapper(self)
 
     def get_connection_params(self):
         settings_dict = self.settings_dict

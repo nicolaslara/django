@@ -17,7 +17,7 @@ from django.db.backends.signals import connection_created
 from django.db.transaction import TransactionManagementError
 from django.db.utils import DatabaseError, DatabaseErrorWrapper
 from django.utils import timezone
-from django.utils.asyncio import async_unsafe
+from django.utils.asyncio import async_unsafe, AsyncHelper
 from django.utils.functional import cached_property
 
 NO_DB_ALIAS = '__no_db__'
@@ -107,6 +107,8 @@ class BaseDatabaseWrapper:
         self.ops = self.ops_class(self)
         self.validation = self.validation_class(self)
 
+        self.a = AsyncHelper(self)
+
     def ensure_timezone(self):
         """
         Ensure the connection's timezone is set to `self.timezone_name` and
@@ -178,7 +180,6 @@ class BaseDatabaseWrapper:
 
     # ##### Backend-specific methods for creating connections #####
 
-    @async_unsafe
     def connect(self):
         """Connect to the database. Assume that the connection is closed."""
         # Check for invalid configurations.
@@ -390,6 +391,7 @@ class BaseDatabaseWrapper:
         self.ensure_connection()
         return self.autocommit
 
+    @async_unsafe
     def set_autocommit(self, autocommit, force_begin_transaction_with_broken_autocommit=False):
         """
         Enable or disable autocommit.
