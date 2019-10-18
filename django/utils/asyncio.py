@@ -37,23 +37,43 @@ def async_unsafe(message):
         return decorator
 
 
-class AsyncHelper:
+class Helper:
+    ignore = []
+
     def __init__(self, parent):
         self.parent = parent
 
+    def super(self):
+        return self.parent.__class__.__mro__[1]
+
     def __getattr__(self, item):
         original = getattr(self.parent, item)
-        if asyncio.iscoroutinefunction(original):
+
+        if item in self.ignore:
             return original
-        return sync_to_async(original)
+
+        if asyncio.iscoroutinefunction(original):
+            # Wrap the function to make it async
+            return self.async_wrapper(original)
+
+        # Wrap the function to make it sync
+        return self.sync_wrapper(original)
+
+    def sync_wrapper(self, f):
+        return f
+
+    def async_wrapper(self, f):
+        return f
+
+
+class AsyncHelper(Helper):
+    def sync_wrapper(self, f):
+        return sync_to_async(f)
+
+    def x(self):
+        return 'x'
 
 
 class SyncHelper:
-    def __init__(self, parent):
-        self.parent = parent
-
-    def __getattr__(self, item):
-        original = getattr(self.parent, item)
-        if asyncio.iscoroutinefunction(original):
-            return async_to_sync(original)
-        return original
+    def async_wrapper(self, f):
+        return async_to_sync(f)
