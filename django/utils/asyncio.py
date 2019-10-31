@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import inspect
+from collections import Coroutine
 
 from asgiref.sync import sync_to_async, async_to_sync
 from django.core.exceptions import SynchronousOnlyOperation
@@ -69,9 +70,6 @@ class Helper:
 class AsyncHelper(Helper):
     def sync_wrapper(self, f):
         return sync_to_async(f)
-
-    def x(self):
-        return 'x'
 
 
 class SyncHelper:

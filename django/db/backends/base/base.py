@@ -255,7 +255,6 @@ class BaseDatabaseWrapper:
 
     # ##### Generic wrappers for PEP-249 connection methods #####
 
-    @async_unsafe
     def cursor(self):
         """Create a cursor, opening a connection if necessary."""
         return self._cursor()
