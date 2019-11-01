@@ -7,6 +7,7 @@
    and `.async_connection` and turn `.connection` into a property  
  * Make `ensure_connection()` work so that we don't require a call to `connect()` 
  * Move wrapping that passes self.a as self to the helper
+ * Use one connection per cursor. This may require connections to go through pools
 
 ## Open issues
 
@@ -14,6 +15,8 @@
  * Keeping async and sync connections at the same time
  * Async backends rely on pools. We need to generalize the wrapper 
    to support pools 
+ * This may be an issue when using s2a/a2s: https://stackoverflow.com/a/32059639.
+   Similar issues exist on other backends.
  
 ## Required work
  
