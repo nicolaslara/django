@@ -8,7 +8,6 @@ import asyncio
 import threading
 import warnings
 
-from asgiref.sync import sync_to_async, async_to_sync
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
@@ -66,7 +65,6 @@ INETARRAY = psycopg2.extensions.new_array_type(
 psycopg2.extensions.register_type(INETARRAY)
 
 
-
 class DatabaseWrapper(BaseDatabaseWrapper):
     vendor = 'postgresql'
     display_name = 'PostgreSQL'
@@ -101,7 +99,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         'TextField': 'text',
         'TimeField': 'time',
         'UUIDField': 'uuid',
-        }
+    }
     data_type_check_constraints = {
         'PositiveIntegerField': '"%(column)s" >= 0',
         'PositiveSmallIntegerField': '"%(column)s" >= 0',
@@ -237,7 +235,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             cursor = self.connection.cursor(name, scrollable=False, withhold=self.connection.autocommit)
         else:
             cursor = self.connection.cursor()
-            cursor.tzinfo_factory = utc_tzinfo_factory if settings.USE_TZ else None
+        cursor.tzinfo_factory = utc_tzinfo_factory if settings.USE_TZ else None
         return cursor
 
     @async_unsafe
